@@ -44,7 +44,7 @@ export default function RootLayout({
         " h-full antialiased"
       }
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-[100dvh] flex-col overflow-x-hidden">
         {children}
       </body>
     </html>

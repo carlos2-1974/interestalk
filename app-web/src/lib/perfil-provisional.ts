@@ -18,6 +18,7 @@ const CLAVE = "interestalk.perfil-provisional.v1";
 const DURACION_MS = 2 * 60 * 60 * 1000;
 const IDIOMAS = ["es", "en", "fr", "de", "it", "pt"];
 const NIVELES: NivelDeclarado[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
+let perfilProvisionalEnMemoria: PerfilProvisional | null = null;
 
 export function perfilValido(valor: unknown): valor is PerfilProvisional {
   if (!valor || typeof valor !== "object") return false;
@@ -43,24 +44,31 @@ export function perfilValido(valor: unknown): valor is PerfilProvisional {
 
 export function guardarPerfilProvisional(perfil: PerfilProvisional): boolean {
   if (typeof window === "undefined" || !perfilValido(perfil)) return false;
+  perfilProvisionalEnMemoria = perfil;
   try {
     window.sessionStorage.setItem(CLAVE, JSON.stringify(perfil));
     return true;
   } catch {
-    return false;
+    return true;
   }
 }
 
 export function leerPerfilProvisional(): PerfilProvisional | null {
   if (typeof window === "undefined") return null;
+  if (perfilProvisionalEnMemoria && perfilValido(perfilProvisionalEnMemoria)) {
+    return perfilProvisionalEnMemoria;
+  }
   try {
     const guardado = window.sessionStorage.getItem(CLAVE);
     if (!guardado) return null;
     const valor: unknown = JSON.parse(guardado);
-    if (perfilValido(valor)) return valor;
+    if (perfilValido(valor)) {
+      perfilProvisionalEnMemoria = valor;
+      return valor;
+    }
     window.sessionStorage.removeItem(CLAVE);
   } catch {
-    return null;
+    return perfilProvisionalEnMemoria;
   }
   return null;
 }
@@ -79,6 +87,7 @@ export type UserLearningProfile = {
 };
 
 const LEARNING_PROFILE_KEY = "interestalk.learning-profile.v1";
+let perfilAprendizajeEnMemoria: UserLearningProfile | null = null;
 
 export const DEFAULT_PRESET_INTERESTS = [
   "CrossFit & Fitness",
@@ -99,59 +108,62 @@ export function guardarPerfilAprendizajeLocal(
   profile: UserLearningProfile
 ): void {
   if (typeof window === "undefined") return;
+  perfilAprendizajeEnMemoria = profile;
   try {
     window.localStorage.setItem(
       LEARNING_PROFILE_KEY,
       JSON.stringify(profile)
     );
-
-    // Mantener sincronizado con perfil provisional para componentes antiguos
-    const provisionalExistente = leerPerfilProvisional();
-    const provisionalActualizado: PerfilProvisional = {
-      version: 1,
-      idiomaApoyo: provisionalExistente?.idiomaApoyo || "es",
-      idiomaAprendizaje: provisionalExistente?.idiomaAprendizaje || "en",
-      nivelDeclarado: profile.level,
-      objetivo: provisionalExistente?.objetivo || "Mejorar fluidez oral",
-      intereses: profile.interests.map((name) => ({
-        id: name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
-        nombre: name,
-      })),
-      interesPrincipalId: profile.interests[0]
-        ? profile.interests[0].toLowerCase().replace(/[^a-z0-9]/g, "-")
-        : "general",
-      creadoEn: Date.now(),
-    };
-    guardarPerfilProvisional(provisionalActualizado);
   } catch (e) {
     console.warn("Fallo guardando perfil local:", e);
   }
+
+  // Mantener sincronizado con perfil provisional para componentes antiguos
+  const provisionalExistente = leerPerfilProvisional();
+  const provisionalActualizado: PerfilProvisional = {
+    version: 1,
+    idiomaApoyo: provisionalExistente?.idiomaApoyo || "es",
+    idiomaAprendizaje: provisionalExistente?.idiomaAprendizaje || "en",
+    nivelDeclarado: profile.level,
+    objetivo: provisionalExistente?.objetivo || "Mejorar fluidez oral",
+    intereses: profile.interests.map((name) => ({
+      id: name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+      nombre: name,
+    })),
+    interesPrincipalId: profile.interests[0]
+      ? profile.interests[0].toLowerCase().replace(/[^a-z0-9]/g, "-")
+      : "general",
+    creadoEn: Date.now(),
+  };
+  guardarPerfilProvisional(provisionalActualizado);
 }
 
 export function leerPerfilAprendizajeLocal(): UserLearningProfile | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(LEARNING_PROFILE_KEY);
-    if (!raw) return null;
+    if (!raw) return perfilAprendizajeEnMemoria;
     const parsed = JSON.parse(raw) as UserLearningProfile;
     if (
       parsed &&
       (parsed.level === "B1" || parsed.level === "B2") &&
       Array.isArray(parsed.interests)
     ) {
+      perfilAprendizajeEnMemoria = parsed;
       return parsed;
     }
   } catch {
-    return null;
+    return perfilAprendizajeEnMemoria;
   }
-  return null;
+  return perfilAprendizajeEnMemoria;
 }
 
 export async function fetchPerfilAprendizaje(
-  userId: string
+  userId: string,
+  forceRemote = false
 ): Promise<UserLearningProfile> {
   const local = leerPerfilAprendizajeLocal();
-  if (local && local.userId === userId) {
+  if (!forceRemote && local && local.userId === userId) {
     return local;
   }
 
@@ -182,6 +194,10 @@ export async function fetchPerfilAprendizaje(
     }
   } catch (err) {
     console.warn("Fallo al obtener perfil remoto, usando fallback local:", err);
+  }
+
+  if (local?.userId === userId) {
+    return local;
   }
 
   const fallback: UserLearningProfile = {

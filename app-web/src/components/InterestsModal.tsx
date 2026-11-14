@@ -39,7 +39,7 @@ export default function InterestsModal({
       setSelectedInterests(initialProfile.interests || []);
       setCustomTopics(initialProfile.customTopics || []);
     } else {
-      setSelectedInterests(["Tecnología", "Viajes"]);
+      setSelectedInterests([]);
       setCustomTopics([]);
     }
   }, [initialProfile, isOpen]);
@@ -90,7 +90,7 @@ export default function InterestsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-      <div className="relative flex max-h-[92vh] w-full max-w-xl flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
+      <div className="modal-scroll-container relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
         {/* CABECERA MODAL */}
         <div className="flex items-start justify-between border-b border-slate-100 pb-4">
           <div>
@@ -213,7 +213,7 @@ export default function InterestsModal({
                   }
                 }}
                 placeholder="Escribe un tema concreto..."
-                className="min-h-11 flex-1 rounded-xl border border-purple-300 bg-white px-4 py-2.5 text-sm placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="min-h-11 flex-1 rounded-xl border border-purple-300 bg-white px-4 py-2.5 text-base placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
               <button
                 type="button"

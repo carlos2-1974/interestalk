@@ -7,16 +7,44 @@
 // ======================================================
 
 const GUEST_STORAGE_KEY = "interestalk.guest-user-id.v1";
+let guestUserIdInMemory: string | null = null;
+
+function createClientUserId(): string {
+  if (typeof window.crypto?.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  if (typeof window.crypto?.getRandomValues === "function") {
+    const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    return (char === "x" ? random : (random & 0x3) | 0x8).toString(16);
+  });
+}
 
 export function getOrCreateClientUserId(): string {
   if (typeof window === "undefined") {
     return "00000000-0000-0000-0000-000000000000";
   }
 
-  let id = window.localStorage.getItem(GUEST_STORAGE_KEY);
+  let id = guestUserIdInMemory;
+  try {
+    id = window.localStorage.getItem(GUEST_STORAGE_KEY) || id;
+  } catch {
+    // Use the in-memory identifier when storage is disabled.
+  }
   if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-    id = window.crypto.randomUUID();
+    id = createClientUserId();
+  }
+  guestUserIdInMemory = id;
+  try {
     window.localStorage.setItem(GUEST_STORAGE_KEY, id);
+  } catch {
+    // Keep the identifier available for this page session.
   }
 
   // Establecer cookie para que el servidor la reciba en SSR / API

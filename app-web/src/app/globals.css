@@ -94,7 +94,9 @@ html {
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
+  overflow-x: hidden;
   background-color: var(--background);
   color: var(--foreground);
 
@@ -106,6 +108,16 @@ body {
 
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+input,
+textarea {
+  font-size: 16px;
+}
+
+.modal-scroll-container {
+  max-height: 90vh;
+  max-height: 90dvh;
 }
 
 /* =====================================================

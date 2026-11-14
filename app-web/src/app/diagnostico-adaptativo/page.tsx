@@ -18,7 +18,7 @@ import {
 
 // ======================================================
 // INTERESTALK - DIAGNOSTICO ADAPTATIVO INTEGRAL V3
-// 3 Pasos: 1. Uso del Inglés -> 2. Listening -> 3. Speaking
+// 3 Pasos: 1. Gramática exprés -> 2. Audio -> 3. Expresión
 // Evaluación con Gemini y asignación de nivel CEFR B1/B2.
 // ======================================================
 
@@ -48,26 +48,7 @@ const GRAMMAR_QUESTIONS: GrammarQuestion[] = [
     opciones: ["since", "for", "during", "from"],
     correcta: 1,
   },
-  {
-    id: "g4",
-    enunciado: "Although the schedule was tight, they _____ to finish the project on time.",
-    opciones: ["managed", "succeeded", "achieved", "capable"],
-    correcta: 0,
-  },
-  {
-    id: "g5",
-    enunciado: "I look forward to _____ you in person at the conference next month.",
-    opciones: ["meet", "meeting", "have met", "met"],
-    correcta: 1,
-  },
 ];
-
-type ListeningQuestion = {
-  id: string;
-  question: string;
-  options: string[];
-  correcta: number;
-};
 
 const LISTENING_DATA = {
   lessonId: "diagnostic-capsule-25s",
@@ -82,16 +63,6 @@ const LISTENING_DATA = {
         "Studying grammar rules for three hours on weekends.",
         "Twenty minutes of high focus every single day.",
         "Memorizing dictionary definitions every morning.",
-      ],
-      correcta: 1,
-    },
-    {
-      id: "l2",
-      question: "Why is it important to engage with topics you genuinely care about?",
-      options: [
-        "Because it makes exams completely unnecessary.",
-        "Because the brain absorbs vocabulary and patterns much faster.",
-        "Because grammar becomes illegal in daily speech.",
       ],
       correcta: 1,
     },
@@ -130,6 +101,7 @@ export default function DiagnosticoAdaptativoPage() {
 
   // Paso 3: Speaking
   const [speakingTranscript, setSpeakingTranscript] = useState("");
+  const [writtenResponseSelected, setWrittenResponseSelected] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
@@ -140,6 +112,8 @@ export default function DiagnosticoAdaptativoPage() {
 
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const writtenResponseRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Cargar perfil
   useEffect(() => {
@@ -180,28 +154,33 @@ export default function DiagnosticoAdaptativoPage() {
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
 
-      recognition.onresult = (event: any) => {
-        let full = "";
-        for (let i = 0; i < event.results.length; ++i) {
-          full += event.results[i][0].transcript + " ";
-        }
-        setSpeakingTranscript(full.trim());
-      };
+        recognition.onresult = (event: any) => {
+          let full = "";
+          for (let i = 0; i < event.results.length; ++i) {
+            full += event.results[i][0].transcript + " ";
+          }
+          setSpeakingTranscript(full.trim());
+        };
 
-      recognition.onerror = () => {
-        setIsRecording(false);
-      };
+        recognition.onerror = () => {
+          setIsRecording(false);
+          recognitionRef.current = null;
+        };
 
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
+        recognition.onend = () => {
+          setIsRecording(false);
+        };
 
-      recognitionRef.current = recognition;
+        recognitionRef.current = recognition;
+      } catch {
+        recognitionRef.current = null;
+      }
     }
 
     return () => {
@@ -212,7 +191,8 @@ export default function DiagnosticoAdaptativoPage() {
   // Manejo de grabacion en Paso 3
   function toggleRecording() {
     if (!recognitionRef.current) {
-      alert("Tu navegador no soporta captura de voz directa. Puedes escribir tu respuesta en el cuadro de texto.");
+      setWrittenResponseSelected(true);
+      writtenResponseRef.current?.focus();
       return;
     }
 
@@ -230,7 +210,17 @@ export default function DiagnosticoAdaptativoPage() {
         }, 1000);
       } catch (err) {
         console.warn("Fallo al iniciar grabacion:", err);
+        setIsRecording(false);
+        recognitionRef.current = null;
       }
+    }
+  }
+
+  async function playDiagnosticAudio() {
+    try {
+      await audioRef.current?.play();
+    } catch (error) {
+      console.warn("El navegador no pudo reproducir el audio diagnóstico:", error);
     }
   }
 
@@ -311,9 +301,6 @@ export default function DiagnosticoAdaptativoPage() {
       }
 
       if (data?.evaluation) {
-        setEvaluationError(null);
-        setEvaluation(data.evaluation);
-
         // Guardar nivel resultante en local y sincronizar
         const currentLocal = leerPerfilAprendizajeLocal();
         const updatedProfile: UserLearningProfile = {
@@ -326,47 +313,28 @@ export default function DiagnosticoAdaptativoPage() {
         };
         guardarPerfilAprendizajeLocal(updatedProfile);
         setProfile(updatedProfile);
+        setEvaluationError(null);
+        setEvaluation(data.evaluation);
+        setCurrentStep(4);
+      } else {
+        throw new Error("La evaluación no devolvió un nivel CEFR.");
       }
     } catch (err) {
       console.error("Error en evaluacion integral:", err);
       setEvaluationError(
         err instanceof Error
           ? err.message
-          : "No se pudo guardar la evaluación. Se mostrará un resultado provisional."
+          : "No se pudo guardar la evaluación. Inténtalo de nuevo."
       );
-      // Fallback
-      setEvaluation({
-        overallLevel: "B1",
-        breakdown: {
-          grammar: "B1 - Buen manejo de estructuras básicas",
-          listening: "B1 - Comprensión adecuada de la idea principal",
-          speaking: "B1 - Capacidad funcional para expresarse",
-        },
-        strengths: ["Disposición activa a comunicarse", "Comprensión auditiva correcta"],
-        focusAreas: ["Practicar tiempos verbales en pasado", "Ampliar conectores discursivos"],
-        recommendation: "Comienza con sesiones de Speaking de 5 o 10 minutos para automatizar tu habla.",
-      });
-      const currentLocal = leerPerfilAprendizajeLocal();
-      const updatedProfile: UserLearningProfile = {
-        userId: getOrCreateClientUserId(),
-        level: "B1",
-        interests: currentLocal?.interests ?? ["Tecnología", "Viajes"],
-        customTopics: currentLocal?.customTopics ?? [],
-        updatedAt: new Date().toISOString(),
-        diagnosticCompleted: true,
-      };
-      guardarPerfilAprendizajeLocal(updatedProfile);
-      setProfile(updatedProfile);
     } finally {
       setIsEvaluating(false);
-      setCurrentStep(4);
     }
   }
 
   const primaryInterest = profile?.interests?.[0] || "tus aficiones o trabajo";
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-12">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8FAFC] text-slate-900 pb-12">
       {/* CABECERA */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-5 py-4">
@@ -399,48 +367,22 @@ export default function DiagnosticoAdaptativoPage() {
       {/* BARRA DE PROGRESO DE 3 PASOS */}
       {currentStep < 4 && (
         <div className="border-b border-slate-100 bg-white px-5 py-3">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                  currentStep >= 1 ? "bg-indigo-700 text-white" : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                1
-              </span>
-              <span className={currentStep === 1 ? "font-bold text-slate-900" : "text-slate-500"}>
-                Uso del Inglés
-              </span>
-            </div>
-
-            <span className="text-slate-300">→</span>
-
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                  currentStep >= 2 ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                2
-              </span>
-              <span className={currentStep === 2 ? "font-bold text-slate-900" : "text-slate-500"}>
-                Listening
-              </span>
-            </div>
-
-            <span className="text-slate-300">→</span>
-
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                  currentStep >= 3 ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                3
-              </span>
-              <span className={currentStep === 3 ? "font-bold text-slate-900" : "text-slate-500"}>
-                Speaking
-              </span>
+          <div className="mx-auto max-w-4xl">
+            <p className="text-center text-sm font-bold text-slate-800" aria-live="polite">
+              Paso {currentStep}/3 · {currentStep === 1 ? "Gramática" : currentStep === 2 ? "Audio" : "Expresión"}
+            </p>
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+              role="progressbar"
+              aria-label="Progreso de calibración"
+              aria-valuemin={1}
+              aria-valuemax={3}
+              aria-valuenow={currentStep}
+            >
+              <div
+                className="h-full rounded-full bg-indigo-700 transition-all"
+                style={{ width: `${(currentStep / 3) * 100}%` }}
+              />
             </div>
           </div>
         </div>
@@ -471,7 +413,7 @@ export default function DiagnosticoAdaptativoPage() {
                 <button
                   key={idx}
                   onClick={() => handleSelectGrammarOption(idx)}
-                  className="flex w-full items-center justify-between rounded-xl border-2 border-slate-200 p-4 text-left text-sm font-semibold text-slate-800 transition-all hover:border-indigo-600 hover:bg-indigo-50/50"
+                  className="flex min-h-12 w-full items-center justify-between rounded-xl border-2 border-slate-200 p-4 text-left text-sm font-semibold text-slate-800 transition-all hover:border-indigo-600 hover:bg-indigo-50/50"
                 >
                   <span>{opcion}</span>
                   <span className="text-xs text-slate-400">Seleccionar →</span>
@@ -491,12 +433,12 @@ export default function DiagnosticoAdaptativoPage() {
                 Paso 2 · Comprensión Auditiva (Listening)
               </span>
               <span className="font-mono text-xs font-semibold text-slate-400">
-                Audio de 25 segundos
+                Audio breve
               </span>
             </div>
 
             <h2 className="mt-4 text-xl font-bold text-slate-900 sm:text-2xl">
-              Escucha el audio y responde a las dos preguntas
+              Escucha el audio y responde a una pregunta
             </h2>
             <p className="mt-1 text-xs text-slate-500">
               Cápsula nativa con voz Neural2. Puedes escucharla las veces que necesites.
@@ -510,9 +452,25 @@ export default function DiagnosticoAdaptativoPage() {
                   Cargando audio diagnóstico...
                 </div>
               ) : audioUrl ? (
-                <audio controls src={audioUrl} className="w-full">
-                  Tu navegador no soporta el reproductor de audio.
-                </audio>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => void playDiagnosticAudio()}
+                    className="min-h-12 w-full rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white hover:bg-teal-800"
+                  >
+                    ▶ Reproducir cápsula de audio
+                  </button>
+                  <audio
+                    ref={audioRef}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    src={audioUrl}
+                    className="w-full"
+                  >
+                    Tu navegador no soporta el reproductor de audio.
+                  </audio>
+                </div>
               ) : (
                 <p className="text-xs text-slate-500 text-center py-2">
                   Cargando cápsula de audio...
@@ -602,43 +560,58 @@ export default function DiagnosticoAdaptativoPage() {
                 {isRecording ? "⏹️" : "🎙️"}
               </button>
 
-              <span className="mt-3 text-xs font-bold text-slate-700">
+              <span className="mt-3 text-center text-xs font-bold text-slate-700">
                 {isRecording
                   ? `Grabando respuesta: ${recordingSeconds}s (pulsa para detener)`
-                  : "Tocar para empezar a grabar tu respuesta"}
+                  : "Si el navegador permite el micrófono, puedes grabar aquí"}
               </span>
 
               {isRecording && (
-                <span className="mt-1 text-[11px] text-rose-600 font-semibold animate-pulse">
+                <span className="mt-1 text-[11px] font-semibold text-rose-600">
                   🔴 Micrófono activo · Habla en inglés
                 </span>
               )}
             </div>
 
-            {/* TRANSCRIPCION EN TIEMPO REAL */}
             <div className="mt-5">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Transcripción de tu respuesta (puedes editar si lo deseas):
+                Tu respuesta en inglés (puedes editarla):
               </label>
               <textarea
+                ref={writtenResponseRef}
                 rows={3}
                 value={speakingTranscript}
                 onChange={(e) => setSpeakingTranscript(e.target.value)}
-                placeholder="Aquí aparecerá lo que digas mientras hablas..."
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3.5 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                placeholder="Aquí aparecerá lo que digas, o escribe tu respuesta..."
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3.5 text-base text-slate-800 focus:border-amber-500 focus:outline-none"
               />
             </div>
 
-            <div className="mt-8 flex justify-end">
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setWrittenResponseSelected(true);
+                  writtenResponseRef.current?.focus();
+                }}
+                className="min-h-12 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+              >
+                Ahora no puedo hablar (responder por escrito en 15 seg)
+              </button>
               <button
                 type="button"
                 disabled={isEvaluating || !speakingTranscript.trim()}
                 onClick={() => void handleFinishEvaluation()}
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-7 py-3 text-sm font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-40"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-600 px-7 py-3 text-sm font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-40"
               >
-                <span>{isEvaluating ? "Evaluando con IA..." : "Finalizar y calcular mi nivel →"}</span>
+                <span>{isEvaluating ? "Evaluando con IA..." : writtenResponseSelected ? "Calcular mi nivel →" : "Finalizar y calcular mi nivel →"}</span>
               </button>
             </div>
+            {evaluationError && (
+              <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                {evaluationError}
+              </p>
+            )}
           </section>
         )}
 
@@ -740,11 +713,11 @@ export default function DiagnosticoAdaptativoPage() {
             {!authUser && (
               <div className="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50 p-5">
                 <h3 className="text-base font-extrabold text-indigo-950">
-                  Guarda tu nivel, tus intereses y desbloquea tus 20 min/día de Speaking
+                  Guarda tu progreso con tu email
                 </h3>
                 <p className="mt-1 text-sm text-indigo-900/80">
                   Crea una cuenta para conservar tu progreso y recuperarlo en otros dispositivos.
-                  También puedes continuar como invitado.
+                  Revisa también Spam o Promociones para encontrar el código.
                 </p>
                 <button
                   type="button"
@@ -753,6 +726,12 @@ export default function DiagnosticoAdaptativoPage() {
                 >
                   Crear cuenta o iniciar sesión →
                 </button>
+                <Link
+                  href="/"
+                  className="ml-4 inline-flex text-xs font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-900"
+                >
+                  Continuar como invitado y guardar más tarde
+                </Link>
               </div>
             )}
 
@@ -764,10 +743,10 @@ export default function DiagnosticoAdaptativoPage() {
 
               <button
                 type="button"
-                onClick={() => router.push("/speaking")}
+                onClick={() => router.push("/")}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-700 px-8 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-800 sm:w-auto"
               >
-                <span>Empezar a practicar en mi nivel ({evaluation.overallLevel}) →</span>
+                <span>Entrar a mi academia personalizada →</span>
               </button>
             </div>
           </section>

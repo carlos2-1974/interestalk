@@ -115,7 +115,11 @@ export default function AuthModal({
 
           // Actualizar localStorage y cookie para usar el user.id autenticado
           if (typeof window !== "undefined") {
-            window.localStorage.setItem("interestalk.guest-user-id.v1", user.id);
+            try {
+              window.localStorage.setItem("interestalk.guest-user-id.v1", user.id);
+            } catch {
+              // Authentication can continue when browser storage is disabled.
+            }
             document.cookie = `interestalk-guest-id=${user.id}; path=/; max-age=31536000; SameSite=Lax`;
           }
         } catch (migErr) {
@@ -143,7 +147,7 @@ export default function AuthModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
+      <div className="modal-scroll-container relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
         <button
           onClick={onClose}
           className="absolute right-5 top-5 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -191,7 +195,7 @@ export default function AuthModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ejemplo@correo.com"
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm placeholder-slate-400 focus:border-indigo-600 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base placeholder-slate-400 focus:border-indigo-600 focus:outline-none"
               />
             </div>
 

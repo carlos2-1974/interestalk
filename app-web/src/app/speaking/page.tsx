@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   leerPerfilProvisional,
   leerPerfilAprendizajeLocal,
+  fetchPerfilAprendizaje,
   type PerfilProvisional,
 } from "@/lib/perfil-provisional";
 import {
@@ -90,7 +92,9 @@ function formatTime(totalSeconds: number): string {
 }
 
 export default function SpeakingPage() {
+  const router = useRouter();
   const [perfil, setPerfil] = useState<PerfilProvisional | null>(null);
+  const [accessReady, setAccessReady] = useState(false);
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("setup");
   const [targetMinutes, setTargetMinutes] = useState<number>(5);
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(0);
@@ -608,28 +612,41 @@ export default function SpeakingPage() {
 
   // 1. Cargar cuota inicial, perfil y parametro ?topic=
   useEffect(() => {
-    const saved = leerPerfilProvisional();
-    if (saved) {
-      setPerfil(saved);
-      perfilRef.current = saved;
-    }
+    let active = true;
 
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const queryTopic = params.get("topic");
-      if (queryTopic?.trim()) {
-        setSelectedTopic(queryTopic.trim());
-        selectedTopicRef.current = queryTopic.trim();
-      } else {
-        const learning = leerPerfilAprendizajeLocal();
-        if (learning && learning.interests && learning.interests.length > 0) {
-          setSelectedTopic(learning.interests[0]);
-          selectedTopicRef.current = learning.interests[0];
+    async function initialize() {
+      const userId = getOrCreateClientUserId();
+      const localProfile = leerPerfilAprendizajeLocal();
+      const learningProfile =
+        localProfile?.userId === userId && localProfile.diagnosticCompleted
+          ? localProfile
+          : await fetchPerfilAprendizaje(userId, true);
+      if (!active) return;
+      if (!learningProfile.diagnosticCompleted) {
+        router.replace("/");
+        return;
+      }
+
+      const saved = leerPerfilProvisional();
+      if (saved) {
+        setPerfil(saved);
+        perfilRef.current = saved;
+      }
+
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const queryTopic = params.get("topic");
+        if (queryTopic?.trim()) {
+          setSelectedTopic(queryTopic.trim());
+          selectedTopicRef.current = queryTopic.trim();
+        } else {
+          if (learningProfile.interests.length > 0) {
+            setSelectedTopic(learningProfile.interests[0]);
+            selectedTopicRef.current = learningProfile.interests[0];
+          }
         }
       }
-    }
 
-    async function initQuota() {
       const quota = await fetchSpeakingQuota();
       if (quota) {
         setRemainingSeconds(quota.remainingSeconds);
@@ -642,14 +659,18 @@ export default function SpeakingPage() {
           safeStopRecognition();
         }
       }
+      setAccessReady(true);
     }
 
-    void initQuota();
-  }, []);
+    void initialize();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   // 2. Setup Web Speech Recognition
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!accessReady || typeof window === "undefined") return;
 
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -887,7 +908,7 @@ export default function SpeakingPage() {
         recognition.stop();
       } catch {}
     };
-  }, []);
+  }, [accessReady]);
 
   function handleActivateMic() {
     if (limitReached) return;
@@ -969,8 +990,16 @@ export default function SpeakingPage() {
   const blockTotalSeconds = targetMinutes * 60;
   const blockSecondsLeft = Math.max(0, blockTotalSeconds - sessionElapsedSeconds);
 
+  if (!accessReady) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-x-hidden bg-[#F8FAFC] px-5 text-slate-600">
+        Comprobando tu calibración...
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-slate-900">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8FAFC] text-slate-900">
       {/* CABECERA */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -1460,6 +1489,9 @@ export default function SpeakingPage() {
                 </div>
 
                 <form onSubmit={handleFormSubmit}>
+                  <p className="mb-2 text-xs text-slate-500">
+                    Puedes escribir tu respuesta en cualquier momento; el micrófono es opcional.
+                  </p>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -1491,7 +1523,7 @@ export default function SpeakingPage() {
                           : "Escribe tu respuesta en inglés o pulsa el micro..."
                       }
                       disabled={limitReached || isLoading}
-                      className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm placeholder-slate-400 focus:border-indigo-600 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                      className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base placeholder-slate-400 focus:border-indigo-600 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
                     />
 
                     <button

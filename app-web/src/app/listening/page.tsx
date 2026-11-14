@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   fetchListeningAudio,
   getOrCreateClientUserId,
   type ListeningAudioResult,
 } from "@/lib/voice-client";
 import {
+  fetchPerfilAprendizaje,
   leerPerfilAprendizajeLocal,
   type UserLearningProfile,
 } from "@/lib/perfil-provisional";
@@ -183,7 +185,9 @@ const BASE_LESSONS: Lesson[] = [
 ];
 
 export default function ListeningPage() {
+  const router = useRouter();
   const [profile, setProfile] = useState<UserLearningProfile | null>(null);
+  const [accessReady, setAccessReady] = useState(false);
   const [lessons, setLessons] = useState<Lesson[]>(BASE_LESSONS);
   const [selectedLesson, setSelectedLesson] = useState<Lesson>(BASE_LESSONS[0]);
   const [selectedVoice, setSelectedVoice] = useState<"en-US-Neural2-F" | "en-GB-Neural2-B">(
@@ -211,17 +215,30 @@ export default function ListeningPage() {
 
   // 1. Cargar perfil y ordenar lecciones segun afinidad
   useEffect(() => {
-    const local = leerPerfilAprendizajeLocal();
-    if (local) {
-      setProfile(local);
-      const userInterests = (local.interests || []).map((i) => i.toLowerCase());
+    let active = true;
 
+    async function loadProfile() {
+      const userId = getOrCreateClientUserId();
+      const local = leerPerfilAprendizajeLocal();
+      const checkedProfile =
+        local?.userId === userId && local.diagnosticCompleted
+          ? local
+          : await fetchPerfilAprendizaje(userId, true);
+
+      if (!active) return;
+      if (!checkedProfile.diagnosticCompleted) {
+        router.replace("/");
+        return;
+      }
+
+      setProfile(checkedProfile);
+      const userInterests = checkedProfile.interests.map((interest) => interest.toLowerCase());
       const sorted = [...BASE_LESSONS].sort((a, b) => {
-        const aMatches = userInterests.some((ui) =>
-          a.topic.toLowerCase().includes(ui) || ui.includes(a.topic.toLowerCase())
+        const aMatches = userInterests.some((interest) =>
+          a.topic.toLowerCase().includes(interest) || interest.includes(a.topic.toLowerCase())
         );
-        const bMatches = userInterests.some((ui) =>
-          b.topic.toLowerCase().includes(ui) || ui.includes(b.topic.toLowerCase())
+        const bMatches = userInterests.some((interest) =>
+          b.topic.toLowerCase().includes(interest) || interest.includes(b.topic.toLowerCase())
         );
         if (aMatches && !bMatches) return -1;
         if (!aMatches && bMatches) return 1;
@@ -230,11 +247,18 @@ export default function ListeningPage() {
 
       setLessons(sorted);
       setSelectedLesson(sorted[0]);
+      setAccessReady(true);
     }
-  }, []);
+
+    void loadProfile();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   // 2. Cargar audio al seleccionar leccion o voz
   useEffect(() => {
+    if (!accessReady) return;
     let cancelado = false;
 
     async function loadAudio() {
@@ -270,10 +294,11 @@ export default function ListeningPage() {
     return () => {
       cancelado = true;
     };
-  }, [selectedLesson, selectedVoice]);
+  }, [accessReady, selectedLesson, selectedVoice]);
 
   useEffect(() => {
     if (
+      !accessReady ||
       answersLessonId !== selectedLesson.id ||
       selectedLesson.questions.length === 0 ||
       selectedLesson.questions.some(
@@ -320,7 +345,7 @@ export default function ListeningPage() {
         "La actividad terminó, pero no se pudo guardar en tu historial educativo."
       );
     });
-  }, [answersLessonId, profile?.level, selectedAnswers, selectedLesson]);
+  }, [accessReady, answersLessonId, profile?.level, selectedAnswers, selectedLesson]);
 
   function handleSpeedChange(speed: number) {
     setPlaybackSpeed(speed);
@@ -380,8 +405,16 @@ export default function ListeningPage() {
 
   const userInterests = (profile?.interests || []).map((i) => i.toLowerCase());
 
+  if (!accessReady) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-x-hidden bg-[#F8FAFC] px-5 text-slate-600">
+        Comprobando tu calibración...
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-slate-900">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8FAFC] text-slate-900">
       {/* CABECERA */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -467,7 +500,7 @@ export default function ListeningPage() {
                 }
               }}
               placeholder="Escribe otro tema (ej. 'Crypto Trading', 'Ciclismo de montaña')..."
-              className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs placeholder-slate-400 focus:border-teal-600 focus:outline-none"
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-base placeholder-slate-400 focus:border-teal-600 focus:outline-none"
             />
             <button
               type="button"

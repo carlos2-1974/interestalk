@@ -175,9 +175,10 @@ function Logo() {
   );
 }
 
-function ModuloCard({ modulo }: { modulo: Modulo }) {
+function ModuloCard({ modulo, locked }: { modulo: Modulo; locked: boolean }) {
+  const isLocked = locked || !modulo.activo;
   const content = (
-    <article className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:shadow-md">
+    <article className={`flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-xs transition-all duration-200 ${isLocked ? "opacity-70" : "hover:-translate-y-1 hover:shadow-md"}`}>
       <div className="flex items-start justify-between gap-3">
         <div
           className={
@@ -193,12 +194,12 @@ function ModuloCard({ modulo }: { modulo: Modulo }) {
 
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            modulo.activo
+            !isLocked
               ? "bg-emerald-50 text-emerald-700"
               : "bg-slate-100 text-slate-500"
           }`}
         >
-          {modulo.badge}
+          {locked ? "🔒 Completa tu calibración para desbloquear" : modulo.badge}
         </span>
       </div>
 
@@ -206,7 +207,7 @@ function ModuloCard({ modulo }: { modulo: Modulo }) {
       <p className="mt-3 text-sm leading-relaxed text-slate-600">{modulo.descripcion}</p>
       <p className="mt-2 text-sm text-slate-500">{modulo.detalle}</p>
 
-      {modulo.activo && (
+      {!isLocked && (
         <span className="mt-4 inline-flex items-center text-xs font-bold text-indigo-700">
           Entrar al módulo →
         </span>
@@ -214,7 +215,7 @@ function ModuloCard({ modulo }: { modulo: Modulo }) {
     </article>
   );
 
-  if (modulo.activo) {
+  if (!isLocked) {
     return <Link href={modulo.href} className="block h-full">{content}</Link>;
   }
 
@@ -237,13 +238,10 @@ export default function Home() {
     const userId = getOrCreateClientUserId();
     const local = leerPerfilAprendizajeLocal();
 
-    if (local) {
+    if (local?.diagnosticCompleted) {
       setProfile(local);
-      if (local.interests.length === 0 && local.customTopics.length === 0) {
-        setIsModalOpen(true);
-      }
     } else {
-      void fetchPerfilAprendizaje(userId).then((p) => {
+      void fetchPerfilAprendizaje(userId, true).then((p) => {
         setProfile(p);
         if (!p || (p.interests.length === 0 && p.customTopics.length === 0)) {
           setIsModalOpen(true);
@@ -287,7 +285,7 @@ export default function Home() {
       process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase();
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-slate-900">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8FAFC] text-slate-900">
       {/* CABECERA */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-12">
@@ -297,33 +295,36 @@ export default function Home() {
             aria-label="Navegación principal"
             className="flex flex-wrap items-center gap-2.5 sm:gap-3"
           >
-            <Link
-              href="/speaking"
-              className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-            >
-              Speaking (20 min)
-            </Link>
+            {hasCompletedDiagnostic && (
+              <>
+                <Link
+                  href="/speaking"
+                  className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Speaking (20 min)
+                </Link>
 
-            <Link
-              href="/listening"
-              className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-            >
-              Listening
-            </Link>
+                <Link
+                  href="/listening"
+                  className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Listening
+                </Link>
 
-            <Link
-              href="/grammar"
-              className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-            >
-              Grammar
-            </Link>
-
-            <Link
-              href="/diagnostico-adaptativo"
-              className="rounded-xl px-4 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
-            >
-              {hasCompletedDiagnostic ? "Repetir evaluación" : "Evaluación inicial (4 min)"}
-            </Link>
+                <Link
+                  href="/grammar"
+                  className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Grammar
+                </Link>
+                <Link
+                  href="/diagnostico-adaptativo"
+                  className="rounded-xl px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+                >
+                  Repetir evaluación
+                </Link>
+              </>
+            )}
 
             {/* ESTADO DE SESION SUPABASE AUTH */}
             {authUser ? (
@@ -348,7 +349,7 @@ export default function Home() {
                 👤 Iniciar sesión / Crear cuenta
               </button>
             )}
-            {isAdmin && (
+            {hasCompletedDiagnostic && isAdmin && (
               <Link
                 href="/admin-stats"
                 className="rounded-xl border border-indigo-200 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"
@@ -363,29 +364,48 @@ export default function Home() {
       {/* BARRA SUPERIOR DE PERSONALIZACION DE INTERESES */}
       <section className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-teal-50/70 px-5 py-3 sm:px-8 lg:px-12">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-indigo-900">Tus temas activos:</span>
-            <span className="rounded-md bg-indigo-700 px-2 py-0.5 font-bold text-white">
-              Nivel {profile?.level || "B1"}
-            </span>
-            {displayedInterests.map((interest) => (
-              <span
-                key={interest}
-                className="rounded-full border border-indigo-200 bg-white px-2.5 py-0.5 font-medium text-indigo-900 shadow-2xs"
-              >
-                {interest}
+          {hasCompletedDiagnostic ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-indigo-900">Tus temas activos:</span>
+              <span className="rounded-md bg-indigo-700 px-2 py-0.5 font-bold text-white">
+                Nivel {profile?.level}
               </span>
-            ))}
-          </div>
+              {displayedInterests.map((interest) => (
+                <span
+                  key={interest}
+                  className="rounded-full border border-indigo-200 bg-white px-2.5 py-0.5 font-medium text-indigo-900 shadow-2xs"
+                >
+                  {interest}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="font-bold text-indigo-900">
+              Paso 1 pendiente · Configura tus intereses y calibra tu nivel (2 min)
+            </span>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300 bg-white px-3.5 py-1.5 font-bold text-indigo-700 shadow-xs transition-colors hover:bg-indigo-50"
-          >
-            <span>✏️</span>
-            <span>Personalizar mis intereses</span>
-          </button>
+          {hasCompletedDiagnostic ? (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300 bg-white px-3.5 py-1.5 font-bold text-indigo-700 shadow-xs transition-colors hover:bg-indigo-50"
+            >
+              <span>✏️</span>
+              <span>Personalizar mis intereses</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                continueToDiagnosticAfterSave.current = true;
+                setIsModalOpen(true);
+              }}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-indigo-700 px-4 py-2 font-bold text-white shadow-xs transition-colors hover:bg-indigo-800"
+            >
+              Configurar mis intereses
+            </button>
+          )}
         </div>
       </section>
 
@@ -419,15 +439,8 @@ export default function Home() {
                     }}
                     className="inline-flex min-h-12 items-center justify-center rounded-xl bg-indigo-700 px-6 py-3 font-bold text-white shadow-md hover:bg-indigo-800 transition-all hover:scale-102"
                   >
-                    1. Configurar intereses y hacer prueba de nivel (4 min) →
+                    1. Configurar intereses y calibrar mi nivel (2 min) →
                   </button>
-
-                  <Link
-                    href="/speaking"
-                    className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    Ir directo a Speaking (Nivel B1)
-                  </Link>
                 </>
               ) : (
                 <>
@@ -464,6 +477,7 @@ export default function Home() {
         </section>
 
         {/* ESCENARIOS DE CONVERSACION RECOMENDADOS HOY */}
+        {hasCompletedDiagnostic ? (
         <section className="mt-12 lg:mt-16">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -520,6 +534,30 @@ export default function Home() {
             ))}
           </div>
         </section>
+        ) : (
+          <section className="mt-12 rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-teal-50 p-6 shadow-xs sm:p-9">
+            <p className="text-xs font-bold uppercase tracking-wider text-indigo-700">
+              Tu ruta de bienvenida en 3 pasos
+            </p>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              {[
+                ["1", "Elige tus temas", "20 seg"],
+                ["2", "Calibración rápida", "90 seg"],
+                ["3", "Desbloquea tu academia personalizada", ""],
+              ].map(([step, title, duration]) => (
+                <div key={step} className="flex items-start gap-3 rounded-2xl border border-white bg-white/80 p-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-700 font-bold text-white">
+                    {step}
+                  </span>
+                  <div>
+                    <h2 className="font-bold text-slate-900">{title}</h2>
+                    {duration && <p className="mt-1 text-sm text-slate-500">{duration}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* MODULOS FORMATIVOS */}
         <section className="mt-14 lg:mt-20" aria-labelledby="titulo-modulos">
@@ -533,7 +571,7 @@ export default function Home() {
 
           <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {MODULOS.map((modulo) => (
-              <ModuloCard key={modulo.nombre} modulo={modulo} />
+              <ModuloCard key={modulo.nombre} modulo={modulo} locked={!hasCompletedDiagnostic} />
             ))}
           </div>
         </section>

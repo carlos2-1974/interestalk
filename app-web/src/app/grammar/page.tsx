@@ -7,8 +7,11 @@ import {
 } from "react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import {
+  fetchPerfilAprendizaje,
+  leerPerfilAprendizajeLocal,
   guardarPerfilProvisional,
   leerPerfilProvisional,
   type PerfilProvisional,
@@ -271,6 +274,8 @@ function textoEstado(
 // ======================================================
 
 export default function GrammarPage() {
+  const router = useRouter();
+  const [accessReady, setAccessReady] = useState(false);
   const [
     perfil,
     setPerfil,
@@ -326,11 +331,38 @@ export default function GrammarPage() {
   const generacionIniciadaRef =
     useRef(false);
 
+  useEffect(() => {
+    let active = true;
+
+    async function verifyDiagnostic() {
+      const userId = getOrCreateClientUserId();
+      const local = leerPerfilAprendizajeLocal();
+      const profile =
+        local?.userId === userId && local.diagnosticCompleted
+          ? local
+          : await fetchPerfilAprendizaje(userId, true);
+
+      if (!active) return;
+      if (!profile.diagnosticCompleted) {
+        router.replace("/");
+        return;
+      }
+
+      setAccessReady(true);
+    }
+
+    void verifyDiagnostic();
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
   // ====================================================
   // GENERAR ACTIVIDAD AL ENTRAR
   // ====================================================
 
   useEffect(() => {
+    if (!accessReady) return;
     if (generacionIniciadaRef.current) {
       return;
     }
@@ -461,7 +493,7 @@ export default function GrammarPage() {
     }
 
     void cargar();
-  }, []);
+  }, [accessReady]);
 
   // ====================================================
   // ACTUALIZAR RESPUESTA
@@ -618,10 +650,18 @@ export default function GrammarPage() {
   // ESTADO CARGANDO
   // ====================================================
 
+  if (!accessReady) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-x-hidden bg-[#F8FAFC] px-5 text-slate-600">
+        Comprobando tu calibración...
+      </main>
+    );
+  }
+
   if (cargando) {
     return (
-      <main className="min-h-screen bg-[#F8FAFC] text-slate-900">
-        <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-5 py-6 sm:px-8">
+      <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8FAFC] text-slate-900">
+        <div className="mx-auto flex min-h-[100dvh] max-w-3xl flex-col px-5 py-6 sm:px-8">
           <header className="flex items-center justify-between border-b border-slate-200 pb-5">
             <Link
               href="/"
@@ -672,8 +712,8 @@ export default function GrammarPage() {
     !actividad
   ) {
     return (
-      <main className="min-h-screen bg-[#F8FAFC] text-slate-900">
-        <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-5 py-6 sm:px-8">
+      <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8FAFC] text-slate-900">
+        <div className="mx-auto flex min-h-[100dvh] max-w-3xl flex-col px-5 py-6 sm:px-8">
           <header className="border-b border-slate-200 pb-5">
             <Link
               href="/"
@@ -730,8 +770,8 @@ export default function GrammarPage() {
   // ====================================================
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-slate-900">
-      <div className="mx-auto min-h-screen max-w-5xl px-5 py-6 sm:px-8 lg:px-12">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8FAFC] text-slate-900">
+      <div className="mx-auto min-h-[100dvh] max-w-5xl px-5 py-6 sm:px-8 lg:px-12">
 
         {/* HEADER */}
 
@@ -1032,7 +1072,7 @@ export default function GrammarPage() {
                                     ? "Escribe la respuesta..."
                                     : "Escribe la frase transformada..."
                                 }
-                                className="mt-5 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none transition-colors focus:border-indigo-600 disabled:bg-slate-50"
+                                className="mt-5 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-base outline-none transition-colors focus:border-indigo-600 disabled:bg-slate-50"
                               />
                             )}
 

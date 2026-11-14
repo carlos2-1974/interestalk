@@ -261,7 +261,7 @@ export default function OnboardingPage() {
 
   const campo =
     "w-full rounded-2xl border border-slate-300 " +
-    "bg-white px-5 py-4 text-slate-900 outline-none " +
+    "bg-white px-5 py-4 text-base text-slate-900 outline-none " +
     "focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100";
 
   const botonPrincipal =
