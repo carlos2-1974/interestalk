@@ -1,0 +1,303 @@
+"use client";
+
+import { useState } from "react";
+
+// =====================================================
+// INTERESTALK - ONBOARDING
+// Fase 1: Bienvenida y seleccion de idiomas
+// =====================================================
+
+const IDIOMAS = [
+  { codigo: "es", nombre: "Español", bandera: "🇪🇸" },
+  { codigo: "en", nombre: "Inglés", bandera: "🇬🇧" },
+  { codigo: "fr", nombre: "Francés", bandera: "🇫🇷" },
+  { codigo: "de", nombre: "Alemán", bandera: "🇩🇪" },
+  { codigo: "it", nombre: "Italiano", bandera: "🇮🇹" },
+  { codigo: "pt", nombre: "Portugués", bandera: "🇵🇹" },
+];
+
+export default function OnboardingPage() {
+  const [paso, setPaso] = useState(1);
+
+  const [idiomaNativo, setIdiomaNativo] = useState("es");
+  const [idiomaAprendizaje, setIdiomaAprendizaje] =
+    useState("");
+
+  const [error, setError] = useState("");
+
+  function continuarIdiomas() {
+    if (!idiomaAprendizaje) {
+      setError("Selecciona el idioma que quieres aprender.");
+      return;
+    }
+
+    if (idiomaNativo === idiomaAprendizaje) {
+      setError(
+        "El idioma de aprendizaje debe ser diferente al de apoyo."
+      );
+      return;
+    }
+
+    setError("");
+    setPaso(3);
+  }
+
+  return (
+    <main className="min-h-screen bg-[#090b12] text-white">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col lg:flex-row">
+
+        {/* PANEL VISUAL */}
+        <section className="relative min-h-[320px] overflow-hidden lg:min-h-screen lg:w-1/2">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage:
+                "url('https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1600&q=85')",
+            }}
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-[#090b12] via-[#090b12]/45 to-[#090b12]/20 lg:bg-gradient-to-r lg:from-transparent lg:to-[#090b12]" />
+
+          <div className="relative z-10 flex h-full min-h-[320px] flex-col justify-between p-8 lg:min-h-screen lg:p-12">
+            <div className="text-2xl font-black tracking-tight">
+              INTERES
+              <span className="text-violet-400">TALK</span>
+            </div>
+
+            <div className="max-w-md">
+              <div className="mb-4 inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium backdrop-blur-md">
+                LANGUAGE LEARNING REIMAGINED
+              </div>
+
+              <h1 className="text-4xl font-bold leading-tight lg:text-6xl">
+                Learn what
+                <br />
+                you <span className="text-violet-400">love.</span>
+              </h1>
+
+              <p className="mt-5 text-base leading-relaxed text-gray-200">
+                Aprende idiomas a través de tus pasiones.
+                Cada experiencia se adapta a tus intereses,
+                objetivos y evolución.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* PANEL DE ONBOARDING */}
+        <section className="flex min-h-[500px] flex-1 items-center justify-center p-6 lg:p-14">
+          <div className="w-full max-w-lg">
+
+            {/* PROGRESO */}
+            <div className="mb-10 flex items-center gap-2">
+              {[1, 2, 3, 4].map((numero) => (
+                <div
+                  key={numero}
+                  className={
+                    "h-1.5 flex-1 rounded-full transition-colors " +
+                    (numero <= paso
+                      ? "bg-violet-500"
+                      : "bg-white/10")
+                  }
+                />
+              ))}
+            </div>
+
+            {/* PASO 1: BIENVENIDA */}
+            {paso === 1 && (
+              <>
+                <div className="mb-5 inline-flex rounded-full border border-violet-400/30 bg-violet-500/10 px-4 py-2 text-sm text-violet-300">
+                  Tu experiencia comienza aquí
+                </div>
+
+                <h2 className="text-3xl font-bold tracking-tight lg:text-4xl">
+                  Un idioma nuevo.
+                  <br />
+                  Un mundo a tu medida.
+                </h2>
+
+                <p className="mt-5 leading-relaxed text-gray-400">
+                  Vamos a conocerte para crear una experiencia
+                  de aprendizaje única, basada en lo que
+                  realmente te apasiona.
+                </p>
+
+                <div className="mt-8 grid grid-cols-2 gap-3">
+                  {[
+                    ["01", "Tus idiomas"],
+                    ["02", "Tu nivel y objetivo"],
+                    ["03", "Tus intereses"],
+                    ["04", "Tu experiencia"],
+                  ].map(([numero, titulo]) => (
+                    <div
+                      key={numero}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md"
+                    >
+                      <span className="text-xs text-violet-400">
+                        {numero}
+                      </span>
+                      <p className="mt-2 text-sm font-medium">
+                        {titulo}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPaso(2)}
+                  className="mt-10 w-full rounded-2xl bg-violet-600 px-6 py-4 font-semibold transition-colors hover:bg-violet-500"
+                >
+                  Empezar mi experiencia →
+                </button>
+
+                <p className="mt-5 text-center text-xs text-gray-500">
+                  Personalización con IA · Podrás cambiar
+                  tus intereses más adelante
+                </p>
+              </>
+            )}
+
+            {/* PASO 2: IDIOMAS */}
+            {paso === 2 && (
+              <>
+                <span className="text-sm font-medium text-violet-400">
+                  PASO 2 DE 4
+                </span>
+
+                <h2 className="mt-4 text-3xl font-bold">
+                  ¿Qué idioma quieres aprender?
+                </h2>
+
+                <p className="mt-4 text-gray-400">
+                  Selecciona el idioma que quieres dominar
+                  y el idioma en el que prefieres recibir
+                  explicaciones.
+                </p>
+
+                <div className="mt-8 space-y-6">
+
+                  <div>
+                    <label
+                      htmlFor="idioma-nativo"
+                      className="mb-3 block text-sm font-medium text-gray-300"
+                    >
+                      Mi idioma de apoyo
+                    </label>
+
+                    <select
+                      id="idioma-nativo"
+                      value={idiomaNativo}
+                      onChange={(e) => {
+                        setIdiomaNativo(e.target.value);
+                        setError("");
+                      }}
+                      className="w-full rounded-2xl border border-white/10 bg-[#151823] px-5 py-4 text-white outline-none focus:border-violet-500"
+                    >
+                      {IDIOMAS.map((idioma) => (
+                        <option
+                          key={idioma.codigo}
+                          value={idioma.codigo}
+                        >
+                          {idioma.bandera} {idioma.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="idioma-aprendizaje"
+                      className="mb-3 block text-sm font-medium text-gray-300"
+                    >
+                      Quiero aprender
+                    </label>
+
+                    <select
+                      id="idioma-aprendizaje"
+                      value={idiomaAprendizaje}
+                      onChange={(e) => {
+                        setIdiomaAprendizaje(e.target.value);
+                        setError("");
+                      }}
+                      className="w-full rounded-2xl border border-white/10 bg-[#151823] px-5 py-4 text-white outline-none focus:border-violet-500"
+                    >
+                      <option value="">
+                        Selecciona un idioma...
+                      </option>
+
+                      {IDIOMAS.map((idioma) => (
+                        <option
+                          key={idioma.codigo}
+                          value={idioma.codigo}
+                        >
+                          {idioma.bandera} {idioma.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                </div>
+
+                {error && (
+                  <p
+                    role="alert"
+                    className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
+                  >
+                    {error}
+                  </p>
+                )}
+
+                <div className="mt-10 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaso(1)}
+                    className="rounded-2xl border border-white/20 px-6 py-4 font-medium transition-colors hover:bg-white/10"
+                  >
+                    ← Volver
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={continuarIdiomas}
+                    className="flex-1 rounded-2xl bg-violet-600 px-6 py-4 font-semibold transition-colors hover:bg-violet-500"
+                  >
+                    Continuar →
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* PASO 3: PROVISIONAL */}
+            {paso === 3 && (
+              <>
+                <span className="text-sm font-medium text-violet-400">
+                  SIGUIENTE ETAPA
+                </span>
+
+                <h2 className="mt-4 text-3xl font-bold">
+                  Tu nivel y tus objetivos
+                </h2>
+
+                <p className="mt-4 text-gray-400">
+                  Has seleccionado correctamente tus idiomas.
+                  En el siguiente desarrollo configuraremos
+                  tu nivel y objetivo de aprendizaje.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setPaso(2)}
+                  className="mt-8 rounded-xl border border-white/20 px-5 py-3 text-sm hover:bg-white/10"
+                >
+                  ← Volver
+                </button>
+              </>
+            )}
+
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}

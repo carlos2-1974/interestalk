@@ -1,0 +1,450 @@
+import "server-only";
+
+// ======================================================
+// INTERESTALK - ORQUESTADOR ADAPTATIVO V2
+//
+// Integra:
+// - Banco de 54 preguntas
+// - Motor adaptativo V2
+// - Configuracion del diagnostico
+// - Control de cobertura y finalizacion
+//
+// Modulo exclusivo del servidor.
+// No determina ni certifica un nivel MCER.
+// ======================================================
+
+import {
+  obtenerPreguntasV2,
+  corregirPreguntaV2,
+  type PreguntaPublicaV2,
+  type Competencia,
+} from "./preguntas-v2";
+
+import {
+  crearEstadoAdaptativo,
+  decidirSiguienteNivel,
+  type EstadoAdaptativo,
+  type NivelMCERAdaptativo,
+  type RespuestaEvaluada,
+  type MovimientoAdaptativo,
+} from "./adaptativo";
+
+import {
+  CONFIG_DIAGNOSTICO,
+  coberturaCompleta,
+  limitePreguntasAlcanzado,
+  idiomaDiagnosticoDisponible,
+  type CompetenciaDiagnostico,
+} from "./configuracion";
+
+// ------------------------------------------------------
+// TIPOS
+// ------------------------------------------------------
+
+export type MotivoFinalizacion =
+  | "maximo_preguntas"
+  | "sin_preguntas"
+  | null;
+
+export type EstadoFinalDiagnostico =
+  | "en_curso"
+  | "completado"
+  | "incompleto";
+
+export type ConteosCompetencias = Record<
+  CompetenciaDiagnostico,
+  number
+>;
+
+export type SesionDiagnosticoV2 = {
+  idioma: string;
+  estado: EstadoAdaptativo;
+  historial: RespuestaEvaluada[];
+  preguntasUsadas: string[];
+  preguntaActualId: string | null;
+
+  conteos: ConteosCompetencias;
+
+  estadoFinal: EstadoFinalDiagnostico;
+  motivoFinalizacion: MotivoFinalizacion;
+};
+
+export type ResultadoPasoV2 = {
+  sesion: SesionDiagnosticoV2;
+  siguientePregunta: PreguntaPublicaV2 | null;
+  movimiento: MovimientoAdaptativo;
+  motivo: string;
+};
+
+// ------------------------------------------------------
+// CONFIGURACION
+// ------------------------------------------------------
+
+const COMPETENCIAS: Competencia[] = [
+  "grammar",
+  "vocabulary",
+  "reading",
+];
+
+function crearConteos(): ConteosCompetencias {
+  return {
+    grammar: 0,
+    vocabulary: 0,
+    reading: 0,
+  };
+}
+
+function validarNivel(
+  nivel: string
+): nivel is NivelMCERAdaptativo {
+  return CONFIG_DIAGNOSTICO.niveles.some(
+    (item) => item === nivel
+  );
+}
+
+// ------------------------------------------------------
+// CREACION DE SESION
+// ------------------------------------------------------
+
+export function crearSesionV2(
+  idioma: string,
+  nivelInicial: NivelMCERAdaptativo
+): SesionDiagnosticoV2 {
+  if (!idiomaDiagnosticoDisponible(idioma)) {
+    throw new Error(
+      "Idioma no disponible para el diagnostico."
+    );
+  }
+
+  if (!validarNivel(nivelInicial)) {
+    throw new Error("Nivel inicial no valido.");
+  }
+
+  return {
+    idioma,
+    estado: crearEstadoAdaptativo(nivelInicial),
+    historial: [],
+    preguntasUsadas: [],
+    preguntaActualId: null,
+    conteos: crearConteos(),
+    estadoFinal: "en_curso",
+    motivoFinalizacion: null,
+  };
+}
+
+// ------------------------------------------------------
+// SELECCION DE COMPETENCIA
+// ------------------------------------------------------
+
+// Priorizar la competencia con mayor deficit
+// respecto a su cobertura minima.
+function ordenarCompetencias(
+  conteos: ConteosCompetencias
+): Competencia[] {
+  return [...COMPETENCIAS].sort((a, b) => {
+    const deficitA = Math.max(
+      0,
+      CONFIG_DIAGNOSTICO.coberturaMinima[a] -
+        conteos[a]
+    );
+
+    const deficitB = Math.max(
+      0,
+      CONFIG_DIAGNOSTICO.coberturaMinima[b] -
+        conteos[b]
+    );
+
+    if (deficitA !== deficitB) {
+      return deficitB - deficitA;
+    }
+
+    return conteos[a] - conteos[b];
+  });
+}
+
+// ------------------------------------------------------
+// SELECCION DE PREGUNTAS
+// ------------------------------------------------------
+
+export function seleccionarPreguntaV2(
+  sesion: SesionDiagnosticoV2
+): PreguntaPublicaV2 | null {
+  if (sesion.estadoFinal !== "en_curso") {
+    return null;
+  }
+
+  if (
+    limitePreguntasAlcanzado(
+      sesion.historial.length
+    )
+  ) {
+    return null;
+  }
+
+  const nivel = sesion.estado.nivelActual;
+
+  const competencias = ordenarCompetencias(
+    sesion.conteos
+  );
+
+  // Priorizar el nivel actual.
+  for (const competencia of competencias) {
+    const disponibles = obtenerPreguntasV2(
+      sesion.idioma,
+      nivel,
+      competencia,
+      sesion.preguntasUsadas
+    );
+
+    if (disponibles.length > 0) {
+      return disponibles[0];
+    }
+  }
+
+  // No se cambia arbitrariamente de nivel
+  // cuando se agotan las preguntas disponibles.
+  return null;
+}
+
+// ------------------------------------------------------
+// INICIAR DIAGNOSTICO
+// ------------------------------------------------------
+
+export function iniciarDiagnosticoV2(
+  idioma: string,
+  nivelInicial: NivelMCERAdaptativo
+) {
+  const sesion = crearSesionV2(
+    idioma,
+    nivelInicial
+  );
+
+  const pregunta = seleccionarPreguntaV2(sesion);
+
+  if (!pregunta) {
+    return {
+      sesion: {
+        ...sesion,
+        estadoFinal: "incompleto" as const,
+        motivoFinalizacion: "sin_preguntas" as const,
+      },
+      pregunta: null,
+    };
+  }
+
+  return {
+    sesion: {
+      ...sesion,
+      preguntaActualId: pregunta.id,
+      preguntasUsadas: [pregunta.id],
+    },
+    pregunta,
+  };
+}
+
+// ------------------------------------------------------
+// FINALIZACION
+// ------------------------------------------------------
+
+function finalizarSesion(
+  sesion: SesionDiagnosticoV2,
+  motivo: Exclude<MotivoFinalizacion, null>
+): SesionDiagnosticoV2 {
+  const cobertura = coberturaCompleta(
+    sesion.conteos
+  );
+
+  const suficientesPreguntas =
+    sesion.historial.length >=
+    CONFIG_DIAGNOSTICO.minPreguntas;
+
+  const completa =
+    cobertura && suficientesPreguntas;
+
+  return {
+    ...sesion,
+    preguntaActualId: null,
+    estadoFinal: completa
+      ? "completado"
+      : "incompleto",
+    motivoFinalizacion: motivo,
+  };
+}
+
+// ------------------------------------------------------
+// PROCESAR RESPUESTA
+// ------------------------------------------------------
+
+export function procesarRespuestaV2(
+  sesion: SesionDiagnosticoV2,
+  respuesta: number
+): ResultadoPasoV2 {
+  if (sesion.estadoFinal !== "en_curso") {
+    throw new Error(
+      "La evaluacion ya ha finalizado."
+    );
+  }
+
+  if (!sesion.preguntaActualId) {
+    throw new Error(
+      "No existe una pregunta activa."
+    );
+  }
+
+  if (
+    !Number.isInteger(respuesta) ||
+    respuesta < 0 ||
+    respuesta > 3
+  ) {
+    throw new Error("Respuesta no valida.");
+  }
+
+  const evaluacion = corregirPreguntaV2(
+    sesion.preguntaActualId,
+    respuesta
+  );
+
+  if (!evaluacion) {
+    throw new Error(
+      "No se encontro la pregunta activa."
+    );
+  }
+
+  const nuevoHistorial: RespuestaEvaluada[] = [
+    ...sesion.historial,
+    {
+      preguntaId: evaluacion.preguntaId,
+      nivel: evaluacion.nivel,
+      correcta: evaluacion.correcta,
+    },
+  ];
+
+  const nuevosConteos: ConteosCompetencias = {
+    ...sesion.conteos,
+    [evaluacion.competencia]:
+      sesion.conteos[evaluacion.competencia] + 1,
+  };
+
+  // Las reglas adaptativas solo se aplican
+  // a respuestas del nivel actual.
+  const nivelActual = sesion.estado.nivelActual;
+
+  const historialNivel = nuevoHistorial.filter(
+    (item) => item.nivel === nivelActual
+  );
+
+  // Adaptacion con respuestas nuevas del nivel.
+  // El estado de consumo se controla por bloque
+  // en la version posterior.
+  const estadoAdaptacion: EstadoAdaptativo = {
+    ...sesion.estado,
+    respuestasConsumidas: Math.min(
+      sesion.estado.respuestasConsumidas,
+      historialNivel.length
+    ),
+  };
+
+  const decision = decidirSiguienteNivel(
+    estadoAdaptacion,
+    historialNivel
+  );
+
+  const sesionActualizada: SesionDiagnosticoV2 = {
+    ...sesion,
+    estado: {
+      ...decision.estado,
+      // Mantener el contador dentro del historial
+      // del nivel que se esta evaluando.
+      respuestasConsumidas:
+        decision.movimiento === "mantener"
+          ? estadoAdaptacion.respuestasConsumidas
+          : 0,
+    },
+    historial: nuevoHistorial,
+    conteos: nuevosConteos,
+    preguntaActualId: null,
+  };
+
+  // Limite de preguntas.
+  if (
+    limitePreguntasAlcanzado(
+      nuevoHistorial.length
+    )
+  ) {
+    return {
+      sesion: finalizarSesion(
+        sesionActualizada,
+        "maximo_preguntas"
+      ),
+      siguientePregunta: null,
+      movimiento: decision.movimiento,
+      motivo: "Limite de preguntas alcanzado.",
+    };
+  }
+
+  const siguientePregunta = seleccionarPreguntaV2(
+    sesionActualizada
+  );
+
+  if (!siguientePregunta) {
+    return {
+      sesion: finalizarSesion(
+        sesionActualizada,
+        "sin_preguntas"
+      ),
+      siguientePregunta: null,
+      movimiento: decision.movimiento,
+      motivo:
+        "No quedan preguntas disponibles en el nivel actual.",
+    };
+  }
+
+  return {
+    sesion: {
+      ...sesionActualizada,
+      preguntaActualId: siguientePregunta.id,
+      preguntasUsadas: [
+        ...sesionActualizada.preguntasUsadas,
+        siguientePregunta.id,
+      ],
+    },
+    siguientePregunta,
+    movimiento: decision.movimiento,
+    motivo: decision.motivo,
+  };
+}
+
+// ------------------------------------------------------
+// RESUMEN DE LA SESION
+// ------------------------------------------------------
+
+export function resumirSesionV2(
+  sesion: SesionDiagnosticoV2
+) {
+  const total = sesion.historial.length;
+
+  const aciertos = sesion.historial.filter(
+    (item) => item.correcta
+  ).length;
+
+  return {
+    estado: sesion.estadoFinal,
+    motivoFinalizacion:
+      sesion.motivoFinalizacion,
+    preguntasRespondidas: total,
+    aciertos,
+    porcentaje:
+      total > 0
+        ? Math.round((aciertos / total) * 100)
+        : 0,
+    conteos: sesion.conteos,
+    coberturaCompleta: coberturaCompleta(
+      sesion.conteos
+    ),
+    dificultadFinal:
+      sesion.estado.nivelActual,
+    cambiosDificultad:
+      sesion.estado.cambiosRealizados,
+    nivelMCERCertificado: false,
+  };
+}

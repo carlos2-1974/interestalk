@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+/* =====================================================
+   INTERESTALK - SISTEMA VISUAL GLOBAL V2.0
+   Academia digital premium de ingles con IA
+   ===================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* Identidad de marca */
+  --brand-primary: #4338ca;
+  --brand-primary-hover: #3730a3;
+  --brand-primary-soft: #eef2ff;
+
+  /* Progreso educativo */
+  --progress-primary: #14b8a6;
+  --progress-dark: #0f766e;
+  --progress-soft: #ccfbf1;
+
+  /* Reconocimientos */
+  --achievement-primary: #f59e0b;
+  --achievement-dark: #92400e;
+  --achievement-soft: #fef3c7;
+
+  /* Superficies */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-secondary: #f1f5f9;
+
+  /* Texto */
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #475569;
+
+  /* Bordes */
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  /* Estados */
+  --success: #0f766e;
+  --warning: #92400e;
+  --danger: #b91c1c;
+
+  /* Efectos */
+  --shadow-card:
+    0 4px 18px rgba(15, 23, 42, 0.04);
+
+  --shadow-card-hover:
+    0 10px 30px rgba(15, 23, 42, 0.08);
+
+  /* Radios */
+  --radius-card: 20px;
+  --radius-button: 12px;
+}
+
+/* =====================================================
+   TAILWIND V4
+   Exponer los tokens al sistema de utilidades
+   ===================================================== */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-soft: var(--brand-primary-soft);
+
+  --color-progress: var(--progress-primary);
+  --color-progress-dark: var(--progress-dark);
+
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+
+  --color-border-default: var(--border-default);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* =====================================================
+   BASE
+   ===================================================== */
+
+html {
+  min-height: 100%;
+  background-color: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+
+  font-family:
+    var(--font-geist-sans),
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* =====================================================
+   ACCESIBILIDAD
+   ===================================================== */
+
+:focus-visible {
+  outline: 3px solid var(--brand-primary);
+  outline-offset: 3px;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* =====================================================
+   MOVIMIENTO REDUCIDO
+   ===================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

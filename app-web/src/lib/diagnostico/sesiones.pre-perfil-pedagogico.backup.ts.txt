@@ -1,0 +1,290 @@
+import "server-only";
+
+// ======================================================
+// INTERESTALK - GESTOR DE SESIONES V1.1
+// Diagnostico adaptativo + informe pedagogico
+//
+// Exclusivamente para desarrollo local.
+// No utilizar en produccion.
+// ======================================================
+
+import { randomUUID } from "node:crypto";
+
+import {
+  iniciarDiagnosticoV2,
+  procesarRespuestaV2,
+  resumirSesionV2,
+  type SesionDiagnosticoV2,
+} from "./orquestador-v2";
+
+import {
+  obtenerPreguntasV2,
+  type PreguntaPublicaV2,
+} from "./preguntas-v2";
+
+import {
+  generarInformePedagogico,
+} from "./informe-pedagogico";
+
+import {
+  CONFIG_DIAGNOSTICO,
+} from "./configuracion";
+
+import type {
+  NivelMCERAdaptativo,
+} from "./adaptativo";
+
+// ======================================================
+// CONFIGURACION LOCAL
+// ======================================================
+
+const DURACION_SESION_MS = 30 * 60 * 1000;
+const MAX_SESIONES = 100;
+
+type RegistroSesion = {
+  id: string;
+  sesion: SesionDiagnosticoV2;
+  creadaEn: number;
+  expiraEn: number;
+  procesando: boolean;
+};
+
+const sesiones = new Map<string, RegistroSesion>();
+
+export type SesionPublica = {
+  sesionId: string;
+  estado: string;
+  pregunta: PreguntaPublicaV2 | null;
+  preguntasRespondidas: number;
+  maxPreguntas: number;
+  expiraEn: string;
+};
+
+// ======================================================
+// FUNCIONES INTERNAS
+// ======================================================
+
+function limpiarSesionesExpiradas(): void {
+  const ahora = Date.now();
+
+  for (const [id, registro] of sesiones) {
+    if (registro.expiraEn <= ahora) {
+      sesiones.delete(id);
+    }
+  }
+}
+
+function obtenerRegistro(
+  sesionId: string
+): RegistroSesion {
+  limpiarSesionesExpiradas();
+
+  const registro = sesiones.get(sesionId);
+
+  if (!registro) {
+    throw new Error(
+      "Sesion inexistente o caducada."
+    );
+  }
+
+  return registro;
+}
+
+function obtenerPreguntaActual(
+  sesion: SesionDiagnosticoV2
+): PreguntaPublicaV2 | null {
+  if (!sesion.preguntaActualId) {
+    return null;
+  }
+
+  return (
+    obtenerPreguntasV2(sesion.idioma).find(
+      (pregunta) =>
+        pregunta.id === sesion.preguntaActualId
+    ) ?? null
+  );
+}
+
+function convertirSesionPublica(
+  registro: RegistroSesion
+): SesionPublica {
+  return {
+    sesionId: registro.id,
+    estado: registro.sesion.estadoFinal,
+    pregunta: obtenerPreguntaActual(
+      registro.sesion
+    ),
+    preguntasRespondidas:
+      registro.sesion.historial.length,
+    maxPreguntas:
+      CONFIG_DIAGNOSTICO.maxPreguntas,
+    expiraEn: new Date(
+      registro.expiraEn
+    ).toISOString(),
+  };
+}
+
+// ======================================================
+// CREAR SESION
+// ======================================================
+
+export function crearSesionTemporal(
+  idioma: string,
+  nivelInicial: NivelMCERAdaptativo
+): SesionPublica {
+  limpiarSesionesExpiradas();
+
+  if (sesiones.size >= MAX_SESIONES) {
+    throw new Error(
+      "Limite de sesiones temporales alcanzado."
+    );
+  }
+
+  const inicio = iniciarDiagnosticoV2(
+    idioma,
+    nivelInicial
+  );
+
+  const ahora = Date.now();
+  const id = randomUUID();
+
+  const registro: RegistroSesion = {
+    id,
+    sesion: inicio.sesion,
+    creadaEn: ahora,
+    expiraEn:
+      ahora + DURACION_SESION_MS,
+    procesando: false,
+  };
+
+  sesiones.set(id, registro);
+
+  return convertirSesionPublica(registro);
+}
+
+// ======================================================
+// CONSULTAR SESION
+// ======================================================
+
+export function consultarSesionTemporal(
+  sesionId: string
+): SesionPublica {
+  const registro = obtenerRegistro(sesionId);
+
+  return convertirSesionPublica(registro);
+}
+
+// ======================================================
+// RESPONDER
+// ======================================================
+
+export function responderSesionTemporal(
+  sesionId: string,
+  preguntaId: string,
+  respuesta: number
+): SesionPublica {
+  const registro = obtenerRegistro(sesionId);
+
+  if (registro.procesando) {
+    throw new Error(
+      "La sesion esta procesando otra respuesta."
+    );
+  }
+
+  if (
+    registro.sesion.estadoFinal !== "en_curso"
+  ) {
+    throw new Error(
+      "La evaluacion ya ha finalizado."
+    );
+  }
+
+  if (
+    registro.sesion.preguntaActualId !==
+    preguntaId
+  ) {
+    throw new Error(
+      "La pregunta no coincide con la pregunta activa."
+    );
+  }
+
+  if (
+    !Number.isInteger(respuesta) ||
+    respuesta < 0 ||
+    respuesta > 3
+  ) {
+    throw new Error(
+      "Respuesta no valida."
+    );
+  }
+
+  registro.procesando = true;
+
+  try {
+    const resultado = procesarRespuestaV2(
+      registro.sesion,
+      respuesta
+    );
+
+    registro.sesion = resultado.sesion;
+
+    return convertirSesionPublica(
+      registro
+    );
+  } finally {
+    registro.procesando = false;
+  }
+}
+
+// ======================================================
+// RESULTADO FINAL + INFORME PEDAGOGICO
+// ======================================================
+
+export function obtenerResultadoSesionTemporal(
+  sesionId: string
+) {
+  const registro = obtenerRegistro(sesionId);
+
+  if (
+    registro.sesion.estadoFinal === "en_curso"
+  ) {
+    throw new Error(
+      "La evaluacion todavia no ha finalizado."
+    );
+  }
+
+  const resultadoGeneral = resumirSesionV2(
+    registro.sesion
+  );
+
+  const informePedagogico =
+    generarInformePedagogico(
+      registro.sesion.idioma,
+      registro.sesion.historial
+    );
+
+  // Se conservan todos los campos anteriores
+  // para no romper la API ni la interfaz actual.
+  // El informe se incorpora como campo adicional.
+
+  return {
+    sesionId,
+    ...resultadoGeneral,
+    informePedagogico,
+  };
+}
+
+// ======================================================
+// ESTADISTICAS INTERNAS
+// ======================================================
+
+export function obtenerEstadisticasSesiones() {
+  limpiarSesionesExpiradas();
+
+  return {
+    sesionesActivas: sesiones.size,
+    limiteSesiones: MAX_SESIONES,
+    duracionMinutos:
+      DURACION_SESION_MS / 60000,
+  };
+}

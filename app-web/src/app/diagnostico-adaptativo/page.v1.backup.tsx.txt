@@ -1,0 +1,581 @@
+"use client";
+
+import { useState } from "react";
+
+// ======================================================
+// INTERESTALK - DIAGNOSTICO ADAPTATIVO V1
+// Interfaz conectada a sesiones del servidor
+// ======================================================
+
+type Pregunta = {
+  id: string;
+  idioma: string;
+  nivel: string;
+  competencia: "grammar" | "vocabulary" | "reading";
+  objetivo: string;
+  enunciado: string;
+  contexto?: string;
+  opciones: string[];
+};
+
+type Sesion = {
+  sesionId: string;
+  estado: "en_curso" | "completado" | "incompleto";
+  pregunta: Pregunta | null;
+  preguntasRespondidas: number;
+  maxPreguntas: number;
+  expiraEn: string;
+};
+
+type Resultado = {
+  sesionId: string;
+  estado: string;
+  motivoFinalizacion: string | null;
+  preguntasRespondidas: number;
+  aciertos: number;
+  porcentaje: number;
+  conteos: {
+    grammar: number;
+    vocabulary: number;
+    reading: number;
+  };
+  coberturaCompleta: boolean;
+  dificultadFinal: string;
+  cambiosDificultad: number;
+  nivelMCERCertificado: boolean;
+};
+
+const COMPETENCIAS = {
+  grammar: "Grammar",
+  vocabulary: "Vocabulary",
+  reading: "Reading",
+};
+
+const NIVELES = [
+  "A1", "A2", "B1", "B2", "C1", "C2",
+];
+
+export default function DiagnosticoAdaptativoPage() {
+  const [nivel, setNivel] = useState("B1");
+  const [sesion, setSesion] = useState<Sesion | null>(null);
+  const [resultado, setResultado] =
+    useState<Resultado | null>(null);
+
+  const [respuesta, setRespuesta] =
+    useState<number | null>(null);
+
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState("");
+
+  const pregunta = sesion?.pregunta ?? null;
+
+  const progreso = sesion
+    ? Math.min(
+        100,
+        (sesion.preguntasRespondidas /
+          sesion.maxPreguntas) * 100
+      )
+    : 0;
+
+  async function iniciar() {
+    if (cargando) return;
+
+    setCargando(true);
+    setError("");
+    setResultado(null);
+    setSesion(null);
+    setRespuesta(null);
+
+    try {
+      const respuestaAPI = await fetch(
+        "/api/diagnostico-adaptativo",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+          body: JSON.stringify({
+            accion: "iniciar",
+            idioma: "en",
+            nivel,
+          }),
+        }
+      );
+
+      const datos = await respuestaAPI.json();
+
+      if (!respuestaAPI.ok) {
+        throw new Error(
+          datos.error ||
+            "No se pudo iniciar la evaluación."
+        );
+      }
+
+      setSesion(datos.sesion);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error al iniciar la evaluación."
+      );
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function obtenerResultado(
+    sesionId: string
+  ) {
+    const respuestaAPI = await fetch(
+      "/api/diagnostico-adaptativo?sesionId=" +
+        encodeURIComponent(sesionId) +
+        "&tipo=resultado",
+      {
+        method: "GET",
+        cache: "no-store",
+      }
+    );
+
+    const datos = await respuestaAPI.json();
+
+    if (!respuestaAPI.ok) {
+      throw new Error(
+        datos.error ||
+          "No se pudo recuperar el resultado."
+      );
+    }
+
+    setResultado(datos.resultado);
+  }
+
+  async function enviarRespuesta() {
+    if (
+      cargando ||
+      !sesion ||
+      !pregunta ||
+      respuesta === null
+    ) {
+      return;
+    }
+
+    setCargando(true);
+    setError("");
+
+    try {
+      const respuestaAPI = await fetch(
+        "/api/diagnostico-adaptativo",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+          body: JSON.stringify({
+            accion: "responder",
+            sesionId: sesion.sesionId,
+            preguntaId: pregunta.id,
+            respuesta,
+          }),
+        }
+      );
+
+      const datos = await respuestaAPI.json();
+
+      if (!respuestaAPI.ok) {
+        throw new Error(
+          datos.error ||
+            "No se pudo enviar la respuesta."
+        );
+      }
+
+      const nuevaSesion: Sesion = datos.sesion;
+
+      setSesion(nuevaSesion);
+      setRespuesta(null);
+
+      if (nuevaSesion.estado !== "en_curso") {
+        await obtenerResultado(
+          nuevaSesion.sesionId
+        );
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error al procesar la respuesta."
+      );
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  function reiniciar() {
+    setSesion(null);
+    setResultado(null);
+    setRespuesta(null);
+    setError("");
+  }
+
+  return (
+    <main className="min-h-screen bg-[#090b12] text-white">
+      <div className="mx-auto min-h-screen max-w-6xl px-6 py-8 lg:px-12">
+
+        {/* CABECERA */}
+        <header className="flex items-center justify-between border-b border-white/10 pb-6">
+          <div className="text-2xl font-black tracking-tight">
+            INTERES
+            <span className="text-violet-400">
+              TALK
+            </span>
+          </div>
+
+          <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-gray-300">
+            PLACEMENT TEST
+          </span>
+        </header>
+
+        <div className="mx-auto flex min-h-[75vh] max-w-3xl items-center justify-center py-12">
+
+          {/* BIENVENIDA */}
+          {!sesion && !resultado && (
+            <section className="w-full text-center">
+              <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl border border-violet-400/30 bg-violet-500/10 text-4xl text-violet-300">
+                ✦
+              </div>
+
+              <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-500/10 px-4 py-2 text-sm text-violet-300">
+                TU PUNTO DE PARTIDA
+              </span>
+
+              <h1 className="mt-6 text-4xl font-bold tracking-tight lg:text-6xl">
+                Descubramos
+                <br />
+                tu nivel.
+              </h1>
+
+              <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-gray-400">
+                Una evaluación que adapta sus preguntas
+                a tus respuestas para conocer mejor
+                tus conocimientos.
+              </p>
+
+              <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6 text-left">
+                <label
+                  htmlFor="nivel-inicial"
+                  className="mb-3 block text-sm font-medium text-gray-300"
+                >
+                  ¿Cuál crees que es tu nivel actual?
+                </label>
+
+                <select
+                  id="nivel-inicial"
+                  value={nivel}
+                  onChange={(e) =>
+                    setNivel(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-[#151823] px-5 py-4 text-white outline-none focus:border-violet-500"
+                >
+                  {NIVELES.map((item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  ))}
+                </select>
+
+                <p className="mt-4 text-sm text-gray-500">
+                  Esta selección es provisional.
+                  La evaluación comenzará cerca
+                  del nivel que indiques.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={cargando}
+                onClick={iniciar}
+                className="mt-8 w-full rounded-2xl bg-violet-600 px-6 py-4 font-semibold transition-colors hover:bg-violet-500 disabled:opacity-50 sm:w-auto sm:min-w-72"
+              >
+                {cargando
+                  ? "Preparando..."
+                  : "Comenzar evaluación →"}
+              </button>
+
+              <p className="mt-6 text-xs text-gray-500">
+                Hasta 20 preguntas · Evaluación orientativa
+              </p>
+            </section>
+          )}
+
+          {/* PREGUNTA */}
+          {sesion &&
+            sesion.estado === "en_curso" &&
+            pregunta &&
+            !resultado && (
+              <section className="w-full">
+
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <span className="text-sm text-gray-400">
+                    Pregunta{" "}
+                    {sesion.preguntasRespondidas + 1}
+                    {" "}de un máximo de{" "}
+                    {sesion.maxPreguntas}
+                  </span>
+
+                  <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-4 py-2 text-xs font-medium text-violet-300">
+                    {COMPETENCIAS[
+                      pregunta.competencia
+                    ]}
+                  </span>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                    style={{
+                      width: progreso + "%",
+                    }}
+                  />
+                </div>
+
+                <div className="mt-12">
+                  <p className="mb-4 text-sm font-medium text-violet-400">
+                    CHOOSE THE CORRECT ANSWER
+                  </p>
+
+                  {pregunta.contexto && (
+                    <div className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-6 leading-relaxed text-gray-300">
+                      {pregunta.contexto}
+                    </div>
+                  )}
+
+                  <h2 className="text-2xl font-bold leading-relaxed lg:text-3xl">
+                    {pregunta.enunciado}
+                  </h2>
+
+                  <div className="mt-9 grid gap-3">
+                    {pregunta.opciones.map(
+                      (opcion, indice) => {
+                        const seleccionada =
+                          respuesta === indice;
+
+                        return (
+                          <button
+                            key={indice}
+                            type="button"
+                            disabled={cargando}
+                            aria-pressed={
+                              seleccionada
+                            }
+                            onClick={() =>
+                              setRespuesta(indice)
+                            }
+                            className={
+                              "flex items-center gap-4 rounded-2xl border p-5 text-left transition-all " +
+                              (seleccionada
+                                ? "border-violet-400 bg-violet-600/20"
+                                : "border-white/10 bg-white/5 hover:border-violet-400/40 hover:bg-white/10")
+                            }
+                          >
+                            <span
+                              className={
+                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-bold " +
+                                (seleccionada
+                                  ? "border-violet-400 bg-violet-600"
+                                  : "border-white/20 bg-white/5")
+                              }
+                            >
+                              {String.fromCharCode(
+                                65 + indice
+                              )}
+                            </span>
+
+                            <span className="font-medium">
+                              {opcion}
+                            </span>
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={
+                      respuesta === null ||
+                      cargando
+                    }
+                    onClick={enviarRespuesta}
+                    className="mt-10 w-full rounded-2xl bg-violet-600 px-8 py-4 font-semibold transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {cargando
+                      ? "Procesando..."
+                      : "Continuar →"}
+                  </button>
+                </div>
+              </section>
+            )}
+
+          {/* RESULTADO FINAL */}
+          {resultado && (
+            <section className="w-full text-center">
+
+              <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl border border-violet-400/30 bg-violet-500/10 text-4xl text-violet-300">
+                ✓
+              </div>
+
+              <h2 className="text-4xl font-bold">
+                Evaluación finalizada
+              </h2>
+
+              <p className="mt-4 text-gray-400">
+                Estos son los resultados
+                de tu evaluación inicial.
+              </p>
+
+              <div className="mt-9 grid grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <p className="text-sm text-gray-400">
+                    Respuestas correctas
+                  </p>
+
+                  <p className="mt-3 text-4xl font-bold text-violet-300">
+                    {resultado.aciertos}/
+                    {resultado.preguntasRespondidas}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <p className="text-sm text-gray-400">
+                    Puntuación
+                  </p>
+
+                  <p className="mt-3 text-4xl font-bold text-violet-300">
+                    {resultado.porcentaje}%
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-7 rounded-2xl border border-white/10 bg-white/5 p-6 text-left">
+                <h3 className="text-lg font-semibold">
+                  Preguntas por competencia
+                </h3>
+
+                <div className="mt-5 space-y-4">
+                  {(
+                    [
+                      "grammar",
+                      "vocabulary",
+                      "reading",
+                    ] as const
+                  ).map((competencia) => (
+                    <div
+                      key={competencia}
+                      className="flex items-center justify-between border-b border-white/10 pb-3 last:border-0"
+                    >
+                      <span className="text-gray-300">
+                        {COMPETENCIAS[
+                          competencia
+                        ]}
+                      </span>
+
+                      <span className="font-semibold">
+                        {resultado.conteos[
+                          competencia
+                        ]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {resultado.estado === "incompleto" && (
+                <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-200">
+                  La evaluación no ha alcanzado
+                  toda la cobertura prevista.
+                  El resultado es parcial.
+                </div>
+              )}
+
+              <p className="mt-7 text-sm leading-relaxed text-gray-500">
+                Esta evaluación todavía no determina
+                un nivel MCER certificado.
+                Los resultados se utilizarán
+                para mejorar el diagnóstico.
+              </p>
+
+              <button
+                type="button"
+                onClick={reiniciar}
+                className="mt-8 rounded-2xl bg-violet-600 px-8 py-4 font-semibold hover:bg-violet-500"
+              >
+                Repetir evaluación
+              </button>
+            </section>
+          )}
+
+          {/* FINALIZACION SIN RESULTADO */}
+          {sesion &&
+            sesion.estado !== "en_curso" &&
+            !resultado && (
+              <section className="w-full text-center">
+                <h2 className="text-3xl font-bold">
+                  Evaluación finalizada
+                </h2>
+
+                <p className="mt-4 text-gray-400">
+                  Estamos recuperando tu resultado.
+                </p>
+
+                <button
+                  type="button"
+                  disabled={cargando}
+                  onClick={() =>
+                    obtenerResultado(
+                      sesion.sesionId
+                    ).catch((err) =>
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : "Error al recuperar resultado."
+                      )
+                    )
+                  }
+                  className="mt-8 rounded-2xl bg-violet-600 px-6 py-4 font-semibold disabled:opacity-50"
+                >
+                  Ver resultado
+                </button>
+              </section>
+            )}
+
+        </div>
+
+        {/* ERRORES */}
+        {error && (
+          <div
+            role="alert"
+            className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 rounded-2xl border border-red-500/30 bg-[#29151c] p-5 text-center text-sm text-red-200 shadow-xl"
+          >
+            <p>{error}</p>
+
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="mt-3 rounded-xl border border-red-400/30 px-4 py-2 hover:bg-white/10"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
+
+        <footer className="border-t border-white/10 py-6 text-center text-xs text-gray-500">
+          INTERESTALK · Learn what you love.
+          · Evaluación orientativa
+        </footer>
+      </div>
+    </main>
+  );
+}

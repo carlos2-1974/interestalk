@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interestalk - AI Language Platform</title>
+    <style>
+        :root {
+            --bg-base: #090a0f;
+            --bg-surface: #12151f;
+            --bg-surface-hover: #1a1f2e;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-glow: rgba(99, 102, 241, 0.3);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --badge-bg: rgba(99, 102, 241, 0.12);
+            --badge-text: #818cf8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.06) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        /* Cabecera flotante Glassmorphism */
+        header {
+            background: rgba(18, 21, 31, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 1.25rem 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-title p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .meta-badges {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .badge {
+            background: var(--badge-bg);
+            color: var(--badge-text);
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-weight: 500;
+            font-size: 0.75rem;
+            border: 1px solid rgba(129, 140, 248, 0.2);
+        }
+
+        .badge-streak {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 2.5rem auto;
+            padding: 0 1.5rem;
+        }
+
+        section {
+            margin-bottom: 2.5rem;
+        }
+
+        h2 {
+            font-size: 1.05rem;
+            font-weight: 500;
+            margin-bottom: 1.25rem;
+            color: var(--text-muted);
+            letter-spacing: 0.025em;
+            text-transform: uppercase;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .card-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Tarjeta con imagen integrada */
+        .card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-glow);
+            box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        .card-image-container {
+            width: 100%;
+            height: 160px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .card-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .card:hover .card-image-container img {
+            transform: scale(1.05);
+        }
+
+        .card-content {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            justify-content: space-between;
+        }
+
+        .card-tag {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--badge-text);
+            margin-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        .card h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            line-height: 1.4;
+            color: #fff;
+        }
+
+        .card p {
+            margin: 0 0 1.25rem 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            padding: 0.6rem 1.1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Reproductor de audio */
+        .audio-wrapper {
+            margin-bottom: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        audio {
+            width: 100%;
+            height: 30px;
+            filter: invert(100%) hue-rotate(180deg) brightness(1.5);
+        }
+
+        /* Tarjeta de Speaking destacada */
+        .speaking-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.08) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 1rem;
+            padding: 2.25rem;
+        }
+
+        .speaking-card h3 {
+            font-size: 1.4rem;
+            color: #fff;
+            margin: 0 0 0.75rem 0;
+        }
+
+        .speaking-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            max-width: 600px;
+            margin-bottom: 1.5rem;
+        }
+
+        .speaking-btn {
+            background: var(--accent-gradient);
+            color: white;
+            font-weight: 600;
+            border: none;
+            padding: 0.75rem 1.75rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .speaking-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 25px rgba(168, 85, 247, 0.6);
+        }
+
+        /* Tabla de métricas */
+        .metrics-container {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .metrics-table th, .metrics-table td {
+            padding: 1rem 1.5rem;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+
+        .metrics-table th {
+            background-color: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            font-weight: 500;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .metrics-table tr:not(:last-child) td {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .metrics-table td {
+            color: var(--text-muted);
+        }
+
+        .metrics-table td:first-child {
+            color: #fff;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1>Interestalk Workspace</h1>
+            <p>Inglés · Sesión diaria de 60 min</p>
+        </div>
+        <div class="meta-badges">
+            <span class="badge-streak">🔥 Racha: 5 días</span>
+            <span class="badge">B1 → B2 Objetivo</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Contenido Recomendado con Imágenes -->
+        <section>
+            <h2>Contenido de hoy adaptado a tus intereses</h2>
+            <div class="card-grid">
+                <!-- Tarjeta Reading -->
+                <div class="card">
+                    <div class="card-image-container">
+                        <img src="https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80" alt="CrossFit Training">
+                    </div>
+                    <div class="card-content">
+                        <div>
+                            <span class="card-tag">Reading · 8 min · CrossFit</span>
+                            <h3>Ben Garard: Response to 4-year drug ban from CrossFit</h3>
+                            <p>Artículo adaptado a tu nivel con análisis de vocabulario técnico enfocado en rendimiento deportivo.</p>
+                        </div>
+                        <a href="https://www.boxrox.com" target="_blank" class="btn">Leer artículo adaptado</a>
+                    </div>
+                </div>
+
+                <!-- Tarjeta Listening -->
+                <div class="card">
+                    <div class="card-image-container">
+                        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80" alt="Artificial Intelligence">
+                    </div>
+                    <div class="card-content">
+                        <div>
+                            <span class="card-tag">Listening · 10 min · Inteligencia Artificial</span>
+                            <h3>AI Business & Tech News Briefing</h3>
+                            <p>Píldora de audio real sobre las últimas tendencias en automatización corporativa.</p>
+                            
+                            <div class="audio-wrapper">
+                                <audio controls>
+                                    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+                                    Tu navegador no soporta audio.
+                                </audio>
+                            </div>
+                        </div>
+                        <a href="#" class="btn" onclick="alert('Abriendo transcripción interactiva con asistencia de IA...'); return false;">Ver transcripción y desglose</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Conversación del día -->
+        <section>
+            <h2>Módulo de Conversación Activa</h2>
+            <div class="speaking-card">
+                <span class="card-tag">Speaking · 12 min · Live Voice Stream</span>
+                <h3>Debate sobre las noticias de hoy</h3>
+                <p>Discute con tu tutor de IA las repercusiones de la actualidad deportiva y el impacto de la inteligencia artificial. Corrección fluida en tiempo real.</p>
+                <button class="speaking-btn" onclick="alert('Conectando con el canal de voz de baja latencia...');">🎙️ Iniciar sesión de voz en directo</button>
+            </div>
+        </section>
+
+        <!-- Cuadro de Evolución -->
+        <section>
+            <h2>Evolución por Competencias</h2>
+            <div class="metrics-container">
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Métrica</th>
+                            <th>Estado Actual</th>
+                            <th>Observaciones del Sistema</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Vocabulario activo</td>
+                            <td>42 términos nuevos</td>
+                            <td>Excelente integración de tecnicismos deportivos; afianzar conectores formales.</td>
+                        </tr>
+                        <tr>
+                            <td>Errores recurrentes</td>
+                            <td>En optimización</td>
+                            <td>Leve tendencia a mezclar pasado simple y presente perfecto en descripciones largas.</td>
+                        </tr>
+                        <tr>
+                            <td>Fluidez oral</td>
+                            <td>115 palabras / min</td>
+                            <td>Ritmo constante, reducción del 35% en pausas vacías respecto a la semana pasada.</td>
+                        </tr>
+                        <tr>
+                            <td>Adherencia al hábito</td>
+                            <td>5 / 5 sesiones</td>
+                            <td>Objetivo semanal completado con éxito. Patrón de constancia muy sólido.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+</body>
+</html>
+```[cite: 1, 2]

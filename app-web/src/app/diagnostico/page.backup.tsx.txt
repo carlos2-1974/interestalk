@@ -1,0 +1,363 @@
+"use client";
+
+import { useState } from "react";
+
+// =====================================================
+// INTERESTALK - PLACEMENT TEST V1
+// Prototipo visual del diagnostico MCER
+// =====================================================
+
+type Pregunta = {
+  id: number;
+  competencia: "Grammar" | "Vocabulary" | "Reading";
+  nivel: string;
+  enunciado: string;
+  contexto?: string;
+  opciones: string[];
+};
+
+// Preguntas de demostracion.
+// No son preguntas oficiales de Cambridge.
+// No incluyen respuestas correctas en esta pantalla.
+const PREGUNTAS: Pregunta[] = [
+  {
+    id: 1,
+    competencia: "Grammar",
+    nivel: "A2",
+    enunciado: "She _____ to work every morning.",
+    opciones: [
+      "go",
+      "goes",
+      "going",
+      "is go",
+    ],
+  },
+  {
+    id: 2,
+    competencia: "Vocabulary",
+    nivel: "B1",
+    enunciado:
+      "Which word is closest in meaning to 'reliable'?",
+    opciones: [
+      "Expensive",
+      "Trustworthy",
+      "Temporary",
+      "Complicated",
+    ],
+  },
+  {
+    id: 3,
+    competencia: "Grammar",
+    nivel: "B1",
+    enunciado:
+      "If I had more time, I _____ another language.",
+    opciones: [
+      "learn",
+      "will learn",
+      "would learn",
+      "learning",
+    ],
+  },
+  {
+    id: 4,
+    competencia: "Reading",
+    nivel: "B1",
+    contexto:
+      "Emma recently started working from home. " +
+      "Although she enjoys avoiding the daily commute, " +
+      "she sometimes misses talking to her colleagues. " +
+      "To stay connected, she schedules regular video calls.",
+    enunciado:
+      "Why does Emma schedule regular video calls?",
+    opciones: [
+      "To find another job",
+      "To stay connected with colleagues",
+      "To avoid working",
+      "To reduce her working hours",
+    ],
+  },
+  {
+    id: 5,
+    competencia: "Grammar",
+    nivel: "B2",
+    enunciado:
+      "By the time we arrived, the meeting _____.",
+    opciones: [
+      "already starts",
+      "has already started",
+      "had already started",
+      "will already start",
+    ],
+  },
+];
+
+export default function DiagnosticoPage() {
+  const [iniciado, setIniciado] = useState(false);
+  const [indice, setIndice] = useState(0);
+  const [respuestas, setRespuestas] = useState<
+    Record<number, number>
+  >({});
+  const [finalizado, setFinalizado] = useState(false);
+
+  const pregunta = PREGUNTAS[indice];
+  const seleccion = respuestas[pregunta.id];
+  const total = PREGUNTAS.length;
+  const progreso = ((indice + 1) / total) * 100;
+
+  function seleccionarRespuesta(opcion: number) {
+    setRespuestas((anteriores) => ({
+      ...anteriores,
+      [pregunta.id]: opcion,
+    }));
+  }
+
+  function continuar() {
+    if (seleccion === undefined) return;
+
+    if (indice < total - 1) {
+      setIndice((actual) => actual + 1);
+    } else {
+      setFinalizado(true);
+    }
+  }
+
+  function reiniciar() {
+    setIniciado(false);
+    setIndice(0);
+    setRespuestas({});
+    setFinalizado(false);
+  }
+
+  return (
+    <main className="min-h-screen bg-[#090b12] text-white">
+      <div className="mx-auto min-h-screen max-w-6xl px-6 py-8 lg:px-12">
+
+        {/* CABECERA */}
+        <header className="flex items-center justify-between border-b border-white/10 pb-6">
+          <div className="text-2xl font-black tracking-tight">
+            INTERES
+            <span className="text-violet-400">TALK</span>
+          </div>
+
+          <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-gray-300">
+            PLACEMENT TEST
+          </div>
+        </header>
+
+        <div className="mx-auto flex min-h-[75vh] max-w-3xl items-center justify-center py-12">
+
+          {/* BIENVENIDA */}
+          {!iniciado && !finalizado && (
+            <section className="w-full text-center">
+
+              <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl border border-violet-400/30 bg-violet-500/10 text-4xl">
+                ✦
+              </div>
+
+              <div className="mb-5 inline-flex rounded-full border border-violet-400/30 bg-violet-500/10 px-4 py-2 text-sm text-violet-300">
+                TU PUNTO DE PARTIDA
+              </div>
+
+              <h1 className="text-4xl font-bold tracking-tight lg:text-6xl">
+                Descubramos
+                <br />
+                tu nivel.
+              </h1>
+
+              <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-gray-400">
+                Queremos conocer cómo utilizas el idioma
+                para ofrecerte una experiencia adaptada
+                a tus conocimientos.
+              </p>
+
+              <div className="mt-10 grid grid-cols-3 gap-3">
+                {[
+                  ["01", "Grammar"],
+                  ["02", "Vocabulary"],
+                  ["03", "Reading"],
+                ].map(([numero, titulo]) => (
+                  <div
+                    key={numero}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                  >
+                    <span className="text-xs text-violet-400">
+                      {numero}
+                    </span>
+                    <p className="mt-2 font-medium">
+                      {titulo}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-8 text-sm text-gray-500">
+                Demostración inicial · 5 preguntas
+                · Sin calificación oficial
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setIniciado(true)}
+                className="mt-8 w-full rounded-2xl bg-violet-600 px-6 py-4 font-semibold transition-colors hover:bg-violet-500 sm:w-auto sm:min-w-72"
+              >
+                Comenzar evaluación →
+              </button>
+            </section>
+          )}
+
+          {/* PREGUNTAS */}
+          {iniciado && !finalizado && (
+            <section className="w-full">
+
+              <div className="mb-6 flex items-center justify-between">
+                <span className="text-sm text-gray-400">
+                  Pregunta {indice + 1} de {total}
+                </span>
+
+                <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-4 py-2 text-xs font-medium text-violet-300">
+                  {pregunta.competencia}
+                </span>
+              </div>
+
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                  style={{ width: progreso + "%" }}
+                />
+              </div>
+
+              <div className="mt-12">
+
+                <p className="mb-4 text-sm font-medium text-violet-400">
+                  CHOOSE THE CORRECT ANSWER
+                </p>
+
+                {pregunta.contexto && (
+                  <div className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-6 leading-relaxed text-gray-300">
+                    {pregunta.contexto}
+                  </div>
+                )}
+
+                <h2 className="text-2xl font-bold leading-relaxed lg:text-3xl">
+                  {pregunta.enunciado}
+                </h2>
+
+                <div className="mt-9 grid gap-3">
+                  {pregunta.opciones.map((opcion, numero) => {
+                    const activa = seleccion === numero;
+
+                    return (
+                      <button
+                        key={numero}
+                        type="button"
+                        aria-pressed={activa}
+                        onClick={() =>
+                          seleccionarRespuesta(numero)
+                        }
+                        className={
+                          "flex items-center gap-4 rounded-2xl border p-5 text-left transition-all " +
+                          (activa
+                            ? "border-violet-400 bg-violet-600/20"
+                            : "border-white/10 bg-white/5 hover:border-violet-400/40 hover:bg-white/10")
+                        }
+                      >
+                        <span
+                          className={
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-bold " +
+                            (activa
+                              ? "border-violet-400 bg-violet-600"
+                              : "border-white/20 bg-white/5")
+                          }
+                        >
+                          {String.fromCharCode(65 + numero)}
+                        </span>
+
+                        <span className="font-medium">
+                          {opcion}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-10 flex items-center justify-between gap-3">
+
+                  <button
+                    type="button"
+                    disabled={indice === 0}
+                    onClick={() =>
+                      setIndice((actual) => actual - 1)
+                    }
+                    className="rounded-2xl border border-white/20 px-6 py-4 font-medium disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    ← Anterior
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={seleccion === undefined}
+                    onClick={continuar}
+                    className="rounded-2xl bg-violet-600 px-8 py-4 font-semibold transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {indice === total - 1
+                      ? "Finalizar prueba"
+                      : "Siguiente →"}
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* FINALIZACION */}
+          {finalizado && (
+            <section className="w-full text-center">
+
+              <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl border border-violet-400/30 bg-violet-500/10 text-4xl text-violet-300">
+                ✓
+              </div>
+
+              <h2 className="text-4xl font-bold">
+                ¡Prueba completada!
+              </h2>
+
+              <p className="mx-auto mt-5 max-w-lg leading-relaxed text-gray-400">
+                Has completado las cinco preguntas
+                de esta demostración.
+              </p>
+
+              <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+                <p className="text-sm text-gray-400">
+                  Preguntas respondidas
+                </p>
+
+                <p className="mt-2 text-4xl font-bold text-violet-300">
+                  {Object.keys(respuestas).length} / {total}
+                </p>
+
+                <p className="mt-4 text-sm text-gray-500">
+                  Esta versión no calcula un nivel MCER.
+                  La corrección segura y la evaluación
+                  adaptativa se incorporarán después.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={reiniciar}
+                className="mt-9 rounded-2xl bg-violet-600 px-8 py-4 font-semibold hover:bg-violet-500"
+              >
+                Repetir demostración
+              </button>
+            </section>
+          )}
+
+        </div>
+
+        <footer className="border-t border-white/10 py-6 text-center text-xs text-gray-500">
+          INTERESTALK · Learn what you love.
+          · Evaluación orientativa, no certificación oficial
+        </footer>
+      </div>
+    </main>
+  );
+}

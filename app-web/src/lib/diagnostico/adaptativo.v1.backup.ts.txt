@@ -1,0 +1,147 @@
+// =====================================================
+// INTERESTALK - MOTOR ADAPTATIVO V1
+// Reglas iniciales de dificultad MCER
+//
+// Este modulo NO calcula una certificacion MCER.
+// Solo decide la dificultad de la siguiente pregunta.
+// =====================================================
+
+export const NIVELES_MCER = [
+  "A1",
+  "A2",
+  "B1",
+  "B2",
+  "C1",
+  "C2",
+] as const;
+
+export type NivelMCERAdaptativo =
+  (typeof NIVELES_MCER)[number];
+
+export type RespuestaEvaluada = {
+  preguntaId: string;
+  nivel: NivelMCERAdaptativo;
+  correcta: boolean;
+};
+
+export type DecisionAdaptativa = {
+  nivelAnterior: NivelMCERAdaptativo;
+  nivelSiguiente: NivelMCERAdaptativo;
+  movimiento: "subir" | "bajar" | "mantener";
+  motivo: string;
+};
+
+function obtenerIndiceNivel(
+  nivel: NivelMCERAdaptativo
+): number {
+  return NIVELES_MCER.indexOf(nivel);
+}
+
+// Cuenta respuestas consecutivas del mismo resultado,
+// comenzando por la respuesta mas reciente.
+function contarRacha(
+  historial: RespuestaEvaluada[],
+  correcta: boolean
+): number {
+  let contador = 0;
+
+  for (let i = historial.length - 1; i >= 0; i--) {
+    if (historial[i].correcta !== correcta) {
+      break;
+    }
+
+    contador++;
+  }
+
+  return contador;
+}
+
+// Decide la dificultad de la siguiente pregunta.
+export function decidirSiguienteNivel(
+  nivelActual: NivelMCERAdaptativo,
+  historial: RespuestaEvaluada[]
+): DecisionAdaptativa {
+  const indiceActual = obtenerIndiceNivel(nivelActual);
+
+  if (historial.length === 0) {
+    return {
+      nivelAnterior: nivelActual,
+      nivelSiguiente: nivelActual,
+      movimiento: "mantener",
+      motivo: "Todavia no existen respuestas evaluadas.",
+    };
+  }
+
+  const rachaCorrectas = contarRacha(historial, true);
+  const rachaIncorrectas = contarRacha(historial, false);
+
+  // Subir despues de tres respuestas correctas
+  if (rachaCorrectas >= 3) {
+    if (indiceActual < NIVELES_MCER.length - 1) {
+      return {
+        nivelAnterior: nivelActual,
+        nivelSiguiente: NIVELES_MCER[indiceActual + 1],
+        movimiento: "subir",
+        motivo:
+          "Tres respuestas correctas consecutivas.",
+      };
+    }
+
+    return {
+      nivelAnterior: nivelActual,
+      nivelSiguiente: nivelActual,
+      movimiento: "mantener",
+      motivo: "Ya se encuentra en el nivel maximo C2.",
+    };
+  }
+
+  // Bajar despues de dos respuestas incorrectas
+  if (rachaIncorrectas >= 2) {
+    if (indiceActual > 0) {
+      return {
+        nivelAnterior: nivelActual,
+        nivelSiguiente: NIVELES_MCER[indiceActual - 1],
+        movimiento: "bajar",
+        motivo:
+          "Dos respuestas incorrectas consecutivas.",
+      };
+    }
+
+    return {
+      nivelAnterior: nivelActual,
+      nivelSiguiente: nivelActual,
+      movimiento: "mantener",
+      motivo: "Ya se encuentra en el nivel minimo A1.",
+    };
+  }
+
+  return {
+    nivelAnterior: nivelActual,
+    nivelSiguiente: nivelActual,
+    movimiento: "mantener",
+    motivo:
+      "Todavia no hay evidencia suficiente para cambiar la dificultad.",
+  };
+}
+
+// Resumen descriptivo del rendimiento.
+// NO asigna un nivel MCER al alumno.
+export function resumirRendimiento(
+  historial: RespuestaEvaluada[]
+) {
+  const total = historial.length;
+
+  const aciertos = historial.filter(
+    (respuesta) => respuesta.correcta
+  ).length;
+
+  return {
+    total,
+    aciertos,
+    errores: total - aciertos,
+    porcentaje:
+      total > 0
+        ? Math.round((aciertos / total) * 100)
+        : 0,
+  };
+}
