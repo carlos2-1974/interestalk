@@ -410,8 +410,7 @@ function validarContraSolicitud(
 export async function generarGrammarV2(
   solicitud: SolicitudGrammarV2
 ): Promise<ActividadGrammarCompleta> {
-  const apiKey =
-    process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
     throw new Error(
@@ -420,8 +419,8 @@ export async function generarGrammarV2(
   }
 
   const modelo =
-    process.env.GEMINI_MODEL_FAST ||
-    process.env.GEMINI_MODEL ||
+    process.env.GEMINI_MODEL_FAST?.trim() ||
+    process.env.GEMINI_MODEL?.trim() ||
     "gemini-3.5-flash-lite";
 
   const ai =

@@ -32,6 +32,7 @@ export default function InterestsModal({
   const [customTopics, setCustomTopics] = useState<string[]>([]);
   const [newTopicInput, setNewTopicInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialProfile) {
@@ -71,21 +72,27 @@ export default function InterestsModal({
 
   async function handleSave() {
     setIsSaving(true);
-    const userId = getOrCreateClientUserId();
+    setSaveError(null);
+    try {
+      const userId = getOrCreateClientUserId();
 
-    const mergedInterests = Array.from(
-      new Set([...selectedInterests, ...customTopics])
-    );
+      const saved = await syncPerfilAprendizaje(userId, {
+        level,
+        interests: selectedInterests,
+        customTopics,
+      });
 
-    const saved = await syncPerfilAprendizaje(userId, {
-      level,
-      interests: mergedInterests.length > 0 ? mergedInterests : ["Tecnología", "Viajes"],
-      customTopics,
-    });
-
-    setIsSaving(false);
-    onSaved(saved);
-    onClose();
+      onSaved(saved);
+      onClose();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron guardar tus preferencias. Inténtalo de nuevo."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -198,7 +205,7 @@ export default function InterestsModal({
               ¿Tienes intereses específicos? Añádelos aquí
             </label>
             <p className="mt-1 text-xs text-slate-600">
-              Ej. <em>"Crossfit Games", "Startups B2B", "Fotografía analógica", "Motos Ducati"</em>
+              Ej. <em>&quot;Crossfit Games&quot;, &quot;Startups B2B&quot;, &quot;Fotografía analógica&quot;, &quot;Motos Ducati&quot;</em>
             </p>
 
             <div className="mt-3 flex gap-2">
@@ -249,6 +256,11 @@ export default function InterestsModal({
 
         {/* PIE DE MODAL */}
         <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+          {saveError && (
+            <p role="alert" className="mr-3 text-xs font-medium text-red-700">
+              {saveError}
+            </p>
+          )}
           <button
             type="button"
             onClick={onClose}

@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 
 import {
   fetchPerfilAprendizaje,
-  leerPerfilAprendizajeLocal,
   guardarPerfilProvisional,
   leerPerfilProvisional,
   type PerfilProvisional,
@@ -336,11 +335,7 @@ export default function GrammarPage() {
 
     async function verifyDiagnostic() {
       const userId = getOrCreateClientUserId();
-      const local = leerPerfilAprendizajeLocal();
-      const profile =
-        local?.userId === userId && local.diagnosticCompleted
-          ? local
-          : await fetchPerfilAprendizaje(userId, true);
+      const profile = await fetchPerfilAprendizaje(userId, true);
 
       if (!active) return;
       if (!profile.diagnosticCompleted) {

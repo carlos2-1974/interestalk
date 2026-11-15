@@ -23,6 +23,20 @@ if (!supabaseServiceRoleKey) {
 
 // Asegurar URL base sin sufijo /rest/v1 para que Auth, Storage y RPC operen correctamente
 const supabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, "");
+try {
+  const parsedUrl = new URL(supabaseUrl);
+  if (
+    !["http:", "https:"].includes(parsedUrl.protocol) ||
+    parsedUrl.username ||
+    parsedUrl.password
+  ) {
+    throw new Error();
+  }
+} catch {
+  throw new Error(
+    "Error de configuracion en arranque: NEXT_PUBLIC_SUPABASE_URL debe ser una URL HTTP(S) valida."
+  );
+}
 
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import {
-  leerPerfilAprendizajeLocal,
   fetchPerfilAprendizaje,
   type UserLearningProfile,
 } from "@/lib/perfil-provisional";
@@ -88,8 +87,7 @@ type ConversationalScenario = {
 };
 
 function generarEscenariosPorIntereses(
-  intereses: string[],
-  level: "B1" | "B2"
+  intereses: string[]
 ): ConversationalScenario[] {
   const list = intereses.length > 0 ? intereses : ["Tecnología", "Viajes", "Deportes"];
 
@@ -236,18 +234,12 @@ export default function Home() {
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
     const userId = getOrCreateClientUserId();
-    const local = leerPerfilAprendizajeLocal();
-
-    if (local?.diagnosticCompleted) {
-      setProfile(local);
-    } else {
-      void fetchPerfilAprendizaje(userId, true).then((p) => {
-        setProfile(p);
-        if (!p || (p.interests.length === 0 && p.customTopics.length === 0)) {
-          setIsModalOpen(true);
-        }
-      });
-    }
+    void fetchPerfilAprendizaje(userId, true).then((p) => {
+      setProfile(p);
+      if (p.interests.length === 0 && p.customTopics.length === 0) {
+        setIsModalOpen(true);
+      }
+    });
 
     // Comprobar sesion Supabase Auth
     void supabase.auth.getUser().then(({ data }) => {
@@ -276,7 +268,7 @@ export default function Home() {
   const displayedInterests =
     activeInterests.length > 0 ? activeInterests : ["Tecnología", "Viajes", "Deportes"];
 
-  const scenarios = generarEscenariosPorIntereses(displayedInterests, profile?.level || "B1");
+  const scenarios = generarEscenariosPorIntereses(displayedInterests);
 
   const hasCompletedDiagnostic = Boolean(profile?.diagnosticCompleted);
   const isAdmin =

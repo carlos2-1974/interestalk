@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 import AuthModal from "@/components/AuthModal";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import {
+  fetchPerfilAprendizaje,
   leerPerfilAprendizajeLocal,
   guardarPerfilAprendizajeLocal,
   type UserLearningProfile,
@@ -117,9 +118,12 @@ export default function DiagnosticoAdaptativoPage() {
 
   // Cargar perfil
   useEffect(() => {
+    const userId = getOrCreateClientUserId();
     const local = leerPerfilAprendizajeLocal();
-    if (local) {
+    if (local?.userId === userId) {
       setProfile(local);
+    } else {
+      void fetchPerfilAprendizaje(userId, true).then(setProfile);
     }
 
     const supabase = getSupabaseBrowserClient();
@@ -274,12 +278,8 @@ export default function DiagnosticoAdaptativoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId,
-          interests: Array.from(
-            new Set([
-              ...(profile?.interests ?? []),
-              ...(profile?.customTopics ?? []),
-            ])
-          ).slice(0, 5),
+          interests: profile?.interests ?? ["Tecnología", "Viajes"],
+          customTopics: profile?.customTopics ?? [],
           grammarScore: {
             correct: grammarCorrect,
             total: GRAMMAR_QUESTIONS.length,
@@ -306,8 +306,8 @@ export default function DiagnosticoAdaptativoPage() {
         const updatedProfile: UserLearningProfile = {
           userId,
           level: data.evaluation.overallLevel,
-          interests: currentLocal?.interests || ["Tecnología", "Viajes"],
-          customTopics: currentLocal?.customTopics || [],
+          interests: currentLocal?.interests ?? profile?.interests ?? ["Tecnología", "Viajes"],
+          customTopics: currentLocal?.customTopics ?? profile?.customTopics ?? [],
           updatedAt: new Date().toISOString(),
           diagnosticCompleted: true,
         };

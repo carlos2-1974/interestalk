@@ -10,7 +10,6 @@ import {
 } from "@/lib/voice-client";
 import {
   fetchPerfilAprendizaje,
-  leerPerfilAprendizajeLocal,
   type UserLearningProfile,
 } from "@/lib/perfil-provisional";
 import { registerLearningEvent } from "@/lib/learning-events-client";
@@ -219,11 +218,7 @@ export default function ListeningPage() {
 
     async function loadProfile() {
       const userId = getOrCreateClientUserId();
-      const local = leerPerfilAprendizajeLocal();
-      const checkedProfile =
-        local?.userId === userId && local.diagnosticCompleted
-          ? local
-          : await fetchPerfilAprendizaje(userId, true);
+      const checkedProfile = await fetchPerfilAprendizaje(userId, true);
 
       if (!active) return;
       if (!checkedProfile.diagnosticCompleted) {
@@ -403,7 +398,10 @@ export default function ListeningPage() {
     setCustomTopicInput("");
   }
 
-  const userInterests = (profile?.interests || []).map((i) => i.toLowerCase());
+  const allUserInterests = Array.from(
+    new Set([...(profile?.interests ?? []), ...(profile?.customTopics ?? [])])
+  );
+  const userInterests = allUserInterests.map((interest) => interest.toLowerCase());
 
   if (!accessReady) {
     return (
@@ -475,7 +473,7 @@ export default function ListeningPage() {
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              {profile?.interests?.slice(0, 3).map((item) => (
+              {allUserInterests.slice(0, 3).map((item) => (
                 <button
                   key={item}
                   type="button"

@@ -89,10 +89,15 @@ export async function GET(request: NextRequest) {
     return jsonNoStore({ error: "FORBIDDEN" }, 403);
   }
 
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase();
   try {
     const { data, error } = await supabaseAdmin.auth.getUser(tokenMatch[1]);
-    if (error || !data.user || !adminEmail || data.user.email !== adminEmail) {
+    if (
+      error ||
+      !data.user ||
+      !adminEmail ||
+      data.user.email?.trim().toLowerCase() !== adminEmail
+    ) {
       return jsonNoStore({ error: "FORBIDDEN" }, 403);
     }
   } catch {

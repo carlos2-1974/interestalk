@@ -15,7 +15,8 @@ const MAX_BODY_BYTES = 16 * 1024;
 
 const evaluacionInputSchema = z.object({
   userId: z.string().trim().min(1).max(200),
-  interests: z.array(z.string().trim().min(1).max(100)).optional(),
+  interests: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+  customTopics: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
   grammarScore: z.object({
     correct: z.number().int().min(0).max(20),
     total: z.number().int().min(1).max(20),
@@ -201,12 +202,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, interests = ["Tecnología", "Viajes"], grammarScore, listeningScore, speakingTranscript } =
-      validation.data;
+    const {
+      userId,
+      interests = ["Tecnología", "Viajes"],
+      customTopics,
+      grammarScore,
+      listeningScore,
+      speakingTranscript,
+    } = validation.data;
+    const allInterests = Array.from(
+      new Set([...interests, ...(customTopics ?? [])])
+    );
 
     // 1. Evaluar las 3 destrezas con Gemini
     const evaluation = await evaluarConGemini({
-      interests,
+      interests: allInterests,
       grammarScore,
       listeningScore,
       speakingTranscript,
@@ -219,7 +229,10 @@ export async function POST(request: NextRequest) {
         {
           user_id: userId,
           level: evaluation.overallLevel,
-          interests: interests.length > 0 ? interests : ["Tecnología", "Viajes"],
+          interests,
+          ...(customTopics === undefined
+            ? {}
+            : { custom_topics: customTopics }),
           diagnostic_completed: true,
           updated_at: new Date().toISOString(),
         },

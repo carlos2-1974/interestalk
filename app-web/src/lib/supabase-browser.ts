@@ -21,6 +21,20 @@ export function getSupabaseBrowserClient(): SupabaseClient {
       "Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY."
     );
   }
+  try {
+    const parsedUrl = new URL(supabaseUrl);
+    if (
+      !["http:", "https:"].includes(parsedUrl.protocol) ||
+      parsedUrl.username ||
+      parsedUrl.password
+    ) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error(
+      "NEXT_PUBLIC_SUPABASE_URL debe ser una URL HTTP(S) valida."
+    );
+  }
 
   browserClient = createClient(supabaseUrl, anonKey, {
     auth: {

@@ -108,6 +108,12 @@ export function guardarPerfilAprendizajeLocal(
   profile: UserLearningProfile
 ): void {
   if (typeof window === "undefined") return;
+  const interests = Array.isArray(profile.interests)
+    ? profile.interests.filter((name) => typeof name === "string")
+    : [];
+  const customTopics = Array.isArray(profile.customTopics)
+    ? profile.customTopics.filter((name) => typeof name === "string")
+    : [];
   perfilAprendizajeEnMemoria = profile;
   try {
     window.localStorage.setItem(
@@ -120,19 +126,27 @@ export function guardarPerfilAprendizajeLocal(
 
   // Mantener sincronizado con perfil provisional para componentes antiguos
   const provisionalExistente = leerPerfilProvisional();
+  const interesesProvisionales = Array.from(
+    new Set([...interests, ...customTopics])
+  )
+    .map((name) => name.trim().slice(0, 60))
+    .filter((name) => name.length >= 2)
+    .slice(0, 5);
+  if (interesesProvisionales.length === 0) {
+    interesesProvisionales.push("Tecnología");
+  }
+  const interesesConIds = interesesProvisionales.map((nombre, index) => ({
+    id: `${nombre.toLowerCase().replace(/[^a-z0-9]/g, "-") || "tema"}-${index}`,
+    nombre,
+  }));
   const provisionalActualizado: PerfilProvisional = {
     version: 1,
     idiomaApoyo: provisionalExistente?.idiomaApoyo || "es",
     idiomaAprendizaje: provisionalExistente?.idiomaAprendizaje || "en",
     nivelDeclarado: profile.level,
     objetivo: provisionalExistente?.objetivo || "Mejorar fluidez oral",
-    intereses: profile.interests.map((name) => ({
-      id: name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
-      nombre: name,
-    })),
-    interesPrincipalId: profile.interests[0]
-      ? profile.interests[0].toLowerCase().replace(/[^a-z0-9]/g, "-")
-      : "general",
+    intereses: interesesConIds,
+    interesPrincipalId: interesesConIds[0].id,
     creadoEn: Date.now(),
   };
   guardarPerfilProvisional(provisionalActualizado);
@@ -143,14 +157,31 @@ export function leerPerfilAprendizajeLocal(): UserLearningProfile | null {
   try {
     const raw = window.localStorage.getItem(LEARNING_PROFILE_KEY);
     if (!raw) return perfilAprendizajeEnMemoria;
-    const parsed = JSON.parse(raw) as UserLearningProfile;
+    const parsed = JSON.parse(raw) as Partial<UserLearningProfile>;
     if (
       parsed &&
       (parsed.level === "B1" || parsed.level === "B2") &&
       Array.isArray(parsed.interests)
     ) {
-      perfilAprendizajeEnMemoria = parsed;
-      return parsed;
+      const profile: UserLearningProfile = {
+        userId: typeof parsed.userId === "string" ? parsed.userId : "",
+        level: parsed.level,
+        interests: parsed.interests.filter(
+          (name): name is string => typeof name === "string"
+        ),
+        customTopics: Array.isArray(parsed.customTopics)
+          ? parsed.customTopics.filter(
+              (name): name is string => typeof name === "string"
+            )
+          : [],
+        updatedAt:
+          typeof parsed.updatedAt === "string"
+            ? parsed.updatedAt
+            : new Date().toISOString(),
+        diagnosticCompleted: parsed.diagnosticCompleted === true,
+      };
+      perfilAprendizajeEnMemoria = profile;
+      return profile;
     }
   } catch {
     return perfilAprendizajeEnMemoria;
@@ -174,29 +205,50 @@ export async function fetchPerfilAprendizaje(
     });
 
     if (res.ok) {
-      const data = (await res.json()) as { profile?: any };
+      const data = (await res.json()) as {
+        profile?: {
+          user_id?: unknown;
+          level?: unknown;
+          interests?: unknown;
+          custom_topics?: unknown;
+          updated_at?: unknown;
+          diagnostic_completed?: unknown;
+        };
+      };
       if (data?.profile) {
         const remoteProfile: UserLearningProfile = {
-          userId: data.profile.user_id,
+          userId:
+            typeof data.profile.user_id === "string"
+              ? data.profile.user_id
+              : userId,
           level: data.profile.level === "B2" ? "B2" : "B1",
           interests: Array.isArray(data.profile.interests)
-            ? data.profile.interests
+            ? data.profile.interests.filter(
+                (name): name is string => typeof name === "string"
+              )
             : ["Tecnología", "Viajes"],
           customTopics: Array.isArray(data.profile.custom_topics)
-            ? data.profile.custom_topics
+            ? data.profile.custom_topics.filter(
+                (name): name is string => typeof name === "string"
+              )
             : [],
-          updatedAt: data.profile.updated_at || new Date().toISOString(),
+          updatedAt:
+            typeof data.profile.updated_at === "string"
+              ? data.profile.updated_at
+              : new Date().toISOString(),
           diagnosticCompleted: data.profile.diagnostic_completed === true,
         };
         guardarPerfilAprendizajeLocal(remoteProfile);
         return remoteProfile;
       }
+      throw new Error("La respuesta no contiene un perfil de aprendizaje.");
     }
+    throw new Error(`No se pudo consultar el perfil (HTTP ${res.status}).`);
   } catch (err) {
-    console.warn("Fallo al obtener perfil remoto, usando fallback local:", err);
+    console.warn("Fallo al obtener perfil remoto:", err);
   }
 
-  if (local?.userId === userId) {
+  if (!forceRemote && local?.userId === userId) {
     return local;
   }
 
@@ -206,8 +258,11 @@ export async function fetchPerfilAprendizaje(
     interests: ["Tecnología", "Viajes", "Deportes"],
     customTopics: [],
     updatedAt: new Date().toISOString(),
+    diagnosticCompleted: false,
   };
-  guardarPerfilAprendizajeLocal(fallback);
+  if (!forceRemote) {
+    guardarPerfilAprendizajeLocal(fallback);
+  }
   return fallback;
 }
 
@@ -235,7 +290,7 @@ export async function syncPerfilAprendizaje(
   guardarPerfilAprendizajeLocal(profile);
 
   try {
-    await fetch("/api/profile", {
+    const response = await fetch("/api/profile", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -248,8 +303,27 @@ export async function syncPerfilAprendizaje(
         customTopics: data.customTopics || [],
       }),
     });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(
+        payload?.error || `No se pudo sincronizar el perfil (HTTP ${response.status}).`
+      );
+    }
+
+    const payload = (await response.json()) as {
+      profile?: { diagnostic_completed?: boolean };
+    };
+    if (!payload.profile) {
+      throw new Error("La respuesta de Supabase no contiene el perfil guardado.");
+    }
+    profile.diagnosticCompleted =
+      payload.profile.diagnostic_completed === true;
+    guardarPerfilAprendizajeLocal(profile);
   } catch (err) {
-    console.warn("Fallo sincronizando perfil con Supabase:", err);
+    console.error("Fallo sincronizando perfil con Supabase:", err);
+    throw err;
   }
 
   return profile;

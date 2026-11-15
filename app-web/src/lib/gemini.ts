@@ -40,15 +40,12 @@ export function seleccionarModelo(
   tipo: TipoTareaModelo
 ): string {
   if (tipo === "evaluacion_compleja") {
-    return (
-      process.env.GEMINI_MODEL_REASONING ||
-      "gemini-4-carbon"
-    );
+    return process.env.GEMINI_MODEL_REASONING?.trim() || "gemini-4-carbon";
   }
 
   return (
-    process.env.GEMINI_MODEL_FAST ||
-    process.env.GEMINI_MODEL ||
+    process.env.GEMINI_MODEL_FAST?.trim() ||
+    process.env.GEMINI_MODEL?.trim() ||
     "gemini-3.5-flash-lite"
   );
 }
@@ -220,7 +217,7 @@ export async function generarContenido(
 
   validarPerfil(perfil);
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
     throw new Error(

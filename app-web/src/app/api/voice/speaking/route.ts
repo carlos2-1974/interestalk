@@ -16,12 +16,11 @@ import {
 // ======================================================
 // INTERESTALK - ENDPOINT POST /api/voice/speaking
 // Limite diario estricto: 1.200 segundos (20 min) / dia.
-// Conversacion B1-B2 adaptada a intereses (max 60 palabras)
+// Conversacion B1-B2 adaptada a intereses (max 45 palabras)
 // con GEMINI_MODEL_FAST + Google Cloud TTS Neural2.
 // ======================================================
 
 const MAX_BODY_BYTES = 16 * 1024;
-const MAX_REPLY_WORDS = 60;
 
 const speakingSchema = z.object({
   message: z.string().trim().min(1).max(1500),
@@ -163,36 +162,6 @@ async function getRecentLearningFocus(userId: string): Promise<string[]> {
     .slice(0, 5)
     .map((item) => item.label);
 }
-
-const speakingResponseSchema = {
-  type: "object",
-  properties: {
-    replyText: {
-      type: "string",
-      description: "Natural spoken English response, concise, plain text without Markdown.",
-    },
-    hasError: {
-      type: "boolean",
-      description: "True if the student made a clear grammar/tense/structure error.",
-    },
-    correctedSentence: {
-      type: "string",
-      nullable: true,
-      description: "Corrected natural English sentence, or null if hasError is false.",
-    },
-    grammarTip: {
-      type: "string",
-      nullable: true,
-      description: "Ultra-brief Spanish explanation (max 12 words), or null if hasError is false.",
-    },
-    sessionEnded: {
-      type: "boolean",
-      description: "True if the conversation is wrapping up or student said goodbye.",
-    },
-  },
-  required: ["replyText", "hasError", "correctedSentence", "grammarTip", "sessionEnded"],
-  additionalProperties: false,
-};
 
 async function generateSpeakingReply(params: {
   message: string;

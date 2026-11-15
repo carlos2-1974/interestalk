@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   leerPerfilProvisional,
-  leerPerfilAprendizajeLocal,
   fetchPerfilAprendizaje,
   type PerfilProvisional,
 } from "@/lib/perfil-provisional";
@@ -616,11 +615,7 @@ export default function SpeakingPage() {
 
     async function initialize() {
       const userId = getOrCreateClientUserId();
-      const localProfile = leerPerfilAprendizajeLocal();
-      const learningProfile =
-        localProfile?.userId === userId && localProfile.diagnosticCompleted
-          ? localProfile
-          : await fetchPerfilAprendizaje(userId, true);
+      const learningProfile = await fetchPerfilAprendizaje(userId, true);
       if (!active) return;
       if (!learningProfile.diagnosticCompleted) {
         router.replace("/");

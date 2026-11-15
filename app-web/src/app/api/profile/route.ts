@@ -97,11 +97,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, level, interests, customTopics = [] } = validation.data;
+    const { userId, level, interests, customTopics } = validation.data;
 
     const { data: currentProfile, error: profileReadError } = await supabaseAdmin
       .from("user_learning_profiles")
-      .select("diagnostic_completed")
+      .select("diagnostic_completed,custom_topics")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           level,
           interests,
-          custom_topics: customTopics,
+          custom_topics: customTopics ?? currentProfile?.custom_topics ?? [],
           diagnostic_completed: currentProfile?.diagnostic_completed ?? false,
           updated_at: new Date().toISOString(),
         },
